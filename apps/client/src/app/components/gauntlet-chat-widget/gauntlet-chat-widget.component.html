@@ -35,19 +35,17 @@
               <div class="gauntlet-bubble">
                 @if (msg.role === 'assistant') {
                   <div class="gauntlet-text gauntlet-markdown">
-                    <markdown [data]="msg.text" />
+                    @if (msg.text === '' && isLoading && $last) {
+                      <span class="gauntlet-typing-dots" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                      </span>
+                    } @else {
+                      <markdown [data]="msg.text" />
+                    }
                   </div>
                 } @else {
                   <span class="gauntlet-text">{{ msg.text }}</span>
                 }
-              </div>
-            </div>
-          }
-          @if (isLoading) {
-            <div class="gauntlet-message gauntlet-message-assistant">
-              <div class="gauntlet-avatar" aria-hidden="true"></div>
-              <div class="gauntlet-bubble gauntlet-loading">
-                <mat-spinner diameter="24" />
               </div>
             </div>
           }

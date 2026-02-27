@@ -14,10 +14,10 @@
 }
 
 .gauntlet-panel {
-  width: 22rem;
+  width: 28rem;
   max-width: calc(100vw - 3rem);
-  height: 28rem;
-  max-height: 70vh;
+  height: 38rem;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   border-radius: 1rem;
@@ -25,6 +25,7 @@
   border: 1px solid rgba(var(--dark-dividers));
   background-color: var(--light-background);
   overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 :host-context(.theme-dark) .gauntlet-panel {
@@ -48,10 +49,10 @@
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
 
   ion-icon {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
   }
 }
 
@@ -75,7 +76,7 @@
 
 .gauntlet-placeholder {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: rgba(var(--dark-secondary-text));
 }
 
@@ -115,22 +116,57 @@
 
 .gauntlet-avatar {
   flex-shrink: 0;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
   background-color: rgba(var(--palette-primary-500), 1);
 }
 
 .gauntlet-bubble {
-  padding: 0.5rem 0.75rem;
+  padding: 0.625rem 0.875rem;
   border-radius: 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  font-size: 0.9375rem;
+  line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
+}
 
-  &.gauntlet-loading {
-    padding: 0.5rem 1rem;
+.gauntlet-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+
+  span {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    opacity: 0.6;
+    animation: gauntlet-typing-bounce 1.4s ease-in-out infinite both;
+
+    &:nth-child(1) {
+      animation-delay: 0s;
+    }
+    &:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+  }
+}
+
+@keyframes gauntlet-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  30% {
+    transform: translateY(-0.35rem);
+    opacity: 1;
   }
 }
 
@@ -189,8 +225,8 @@
 .gauntlet-input {
   flex: 1;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
   border: 1px solid rgba(var(--dark-dividers));
   border-radius: 1.5rem;
   outline: none;
