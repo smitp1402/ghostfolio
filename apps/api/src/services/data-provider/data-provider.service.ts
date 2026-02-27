@@ -1,5 +1,6 @@
 import { ImportDataDto } from '@ghostfolio/api/app/import/import-data.dto';
 import { RedisCacheService } from '@ghostfolio/api/app/redis-cache/redis-cache.service';
+import { environment } from '@ghostfolio/api/environments/environment';
 import { ConfigurationService } from '@ghostfolio/api/services/configuration/configuration.service';
 import { DataProviderInterface } from '@ghostfolio/api/services/data-provider/interfaces/data-provider.interface';
 import { MarketDataService } from '@ghostfolio/api/services/market-data/market-data.service';
@@ -299,7 +300,24 @@ export class DataProviderService implements OnModuleInit {
         }
 
         if (!assetProfile?.name) {
-          if (isNetworkError(assetProfileError)) {
+          const isYahooNetworkErrorInProduction =
+            environment.production &&
+            dataSource === DataSource.YAHOO &&
+            isNetworkError(assetProfileError);
+
+          if (isYahooNetworkErrorInProduction) {
+            Logger.warn(
+              `${activityPath}.symbol ("${symbol}") could not be validated via "${dataSource}" because Yahoo Finance is temporarily unreachable. Falling back to a minimal asset profile in production.`,
+              'DataProviderService'
+            );
+
+            assetProfile = {
+              currency,
+              dataSource,
+              name: symbol,
+              symbol
+            };
+          } else if (isNetworkError(assetProfileError)) {
             throw new Error(
               `${activityPath}.symbol ("${symbol}") could not be validated for data source ("${dataSource}") due to a temporary network error. Please try again.`
             );

@@ -67,20 +67,16 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
   public error: string | null = null;
   public suggestedPrompts: SuggestedPrompt[] = [
     {
-      query: 'Show my current portfolio allocation and top holdings.'
+      query: 'Give me my portfolio overview.'
     },
     {
-      query: 'How did my portfolio perform this year?'
+      query: 'Give me my portfolio performance.'
     },
     {
-      query: 'Run my portfolio report and tell me if there are any rule violations.'
+      query: 'List my recent activity.'
     },
     {
-      query: 'What did I buy and sell in my last 10 activities?'
-    },
-    {
-      query:
-        'Give me my portfolio performance this year, run a portfolio report, and summarize my last 5 activities.'
+      query: 'What are my top holdings and allocation?'
     }
   ];
 
