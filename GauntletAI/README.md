@@ -19,6 +19,22 @@ This folder holds **planning, documentation, and evaluation assets** for the Gau
 - **Repository:** [Ghostfolio](https://github.com/ghostfolio/ghostfolio) (portfolio tracking, open source)  
 - **Existing AI:** `apps/api/src/app/endpoints/ai/` — prompt-based portfolio analysis via OpenRouter; no tools or multi-turn yet.
 
+## Configuration (OpenRouter)
+
+The agent uses **OpenRouter** for the LLM. Configuration is read **first from environment variables** (`.env`), then from the **property store** (database) if not set in env.
+
+- **You must set:** `API_KEY_OPENROUTER` — your [OpenRouter](https://openrouter.ai/) API key.
+- **Optional:** `OPENROUTER_MODEL` — model id (e.g. `openai/gpt-4o`, `anthropic/claude-3.5-sonnet`). If unset, the agent defaults to `openai/gpt-4o`. The model **must support tool/function calling** for the agent to use portfolio tools.
+
+**Option 1 — .env (recommended):** In the project root, copy `.env.example` to `.env` (or use `.env.dev`), then set:
+
+```
+API_KEY_OPENROUTER=sk-or-v1-your-key-here
+OPENROUTER_MODEL=openai/gpt-4o
+```
+
+**Option 2 — Property store:** Set via the admin API or the `Property` table (keys `API_KEY_OPENROUTER`, `OPENROUTER_MODEL`). Env values take precedence over the property store.
+
 ## Quick Start
 
 1. Read **PROJECT_OVERVIEW.md** for full requirements and timeline.

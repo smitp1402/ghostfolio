@@ -9,7 +9,9 @@ export interface Environment extends CleanedEnvAccessors {
   API_KEY_EOD_HISTORICAL_DATA: string;
   API_KEY_FINANCIAL_MODELING_PREP: string;
   API_KEY_OPEN_FIGI: string;
+  API_KEY_OPENROUTER: string;
   API_KEY_RAPID_API: string;
+  OPENROUTER_MODEL: string;
   CACHE_QUOTES_TTL: number;
   CACHE_TTL: number;
   DATA_SOURCE_EXCHANGE_RATES: string;

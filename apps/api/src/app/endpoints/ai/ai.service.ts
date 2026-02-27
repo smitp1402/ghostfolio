@@ -1,4 +1,5 @@
 import { PortfolioService } from '@ghostfolio/api/app/portfolio/portfolio.service';
+import { ConfigurationService } from '@ghostfolio/api/services/configuration/configuration.service';
 import { PropertyService } from '@ghostfolio/api/services/property/property.service';
 import {
   PROPERTY_API_KEY_OPENROUTER,
@@ -36,18 +37,27 @@ export class AiService {
   ];
 
   public constructor(
+    private readonly configurationService: ConfigurationService,
     private readonly portfolioService: PortfolioService,
     private readonly propertyService: PropertyService
   ) {}
 
   public async generateText({ prompt }: { prompt: string }) {
-    const openRouterApiKey = await this.propertyService.getByKey<string>(
+    const apiKeyFromEnv = this.configurationService.get('API_KEY_OPENROUTER');
+    const apiKeyFromStore = await this.propertyService.getByKey<string>(
       PROPERTY_API_KEY_OPENROUTER
     );
+    const openRouterApiKey =
+      apiKeyFromEnv?.trim() || apiKeyFromStore?.trim() || '';
 
-    const openRouterModel = await this.propertyService.getByKey<string>(
+    const modelFromEnv = this.configurationService.get('OPENROUTER_MODEL');
+    const modelFromStore = await this.propertyService.getByKey<string>(
       PROPERTY_OPENROUTER_MODEL
     );
+    const openRouterModel =
+      modelFromEnv?.trim() ||
+      modelFromStore?.trim() ||
+      'openai/gpt-4o';
 
     const openRouterService = createOpenRouter({
       apiKey: openRouterApiKey

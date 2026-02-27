@@ -34,6 +34,7 @@ import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 
 import { GfFooterComponent } from './components/footer/footer.component';
+import { GfGauntletChatWidgetComponent } from './components/gauntlet-chat-widget/gauntlet-chat-widget.component';
 import { GfHeaderComponent } from './components/header/header.component';
 import { GfHoldingDetailDialogComponent } from './components/holding-detail-dialog/holding-detail-dialog.component';
 import { HoldingDetailDialogParams } from './components/holding-detail-dialog/interfaces/interfaces';
@@ -43,7 +44,13 @@ import { UserService } from './services/user/user.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GfFooterComponent, GfHeaderComponent, RouterLink, RouterOutlet],
+  imports: [
+    GfFooterComponent,
+    GfGauntletChatWidgetComponent,
+    GfHeaderComponent,
+    RouterLink,
+    RouterOutlet
+  ],
   selector: 'gf-root',
   styleUrls: ['./app.component.scss'],
   templateUrl: './app.component.html'
