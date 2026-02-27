@@ -42,7 +42,7 @@ export class ImportController {
   @Get('sample')
   @UseGuards(AuthGuard('jwt'))
   public getSample(): Record<string, unknown> {
-    const path = join(process.cwd(), 'test/import/ok/sample-rich.json');
+    const path = join(process.cwd(), 'apps/api/src/assets/sample-rich.json');
     try {
       const raw = readFileSync(path, 'utf-8');
       return JSON.parse(raw) as Record<string, unknown>;

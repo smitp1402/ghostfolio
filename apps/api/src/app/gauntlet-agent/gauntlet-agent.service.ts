@@ -349,6 +349,21 @@ export class GauntletAgentService {
         !response.tool_calls ||
         response.tool_calls.length === 0
       ) {
+        const text =
+          typeof accumulated.content === 'string'
+            ? accumulated.content
+            : Array.isArray(accumulated.content)
+              ? (accumulated.content as { type?: string; text?: string }[])
+                  .map((c) => (c && 'text' in c ? c.text : String(c)))
+                  .join('')
+              : String(accumulated.content ?? '');
+        const final = text.trim() || 'I could not generate a response.';
+        await this.conversationMemoryService.appendTurn(
+          conversationId,
+          userId,
+          message,
+          final
+        );
         return;
       }
 

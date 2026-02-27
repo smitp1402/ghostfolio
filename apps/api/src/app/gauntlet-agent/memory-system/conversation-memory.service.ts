@@ -1,7 +1,7 @@
 import { RedisCacheService } from '@ghostfolio/api/app/redis-cache/redis-cache.service';
 import { ConfigurationService } from '@ghostfolio/api/services/configuration/configuration.service';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import type { BaseMessage } from '@langchain/core/messages';
 import ms from 'ms';
@@ -16,6 +16,8 @@ const DEFAULT_TTL_MS = ms('7 days');
 
 @Injectable()
 export class ConversationMemoryService {
+  private readonly logger = new Logger(ConversationMemoryService.name);
+
   public constructor(
     private readonly redisCacheService: RedisCacheService,
     private readonly configurationService: ConfigurationService
@@ -28,21 +30,31 @@ export class ConversationMemoryService {
   private parseStored(raw: string | ConversationHistory | null): StoredMessage[] {
     if (raw == null) return [];
     if (Array.isArray(raw)) {
-      return raw.every(
+      const valid = raw.every(
         (m) =>
           m &&
           typeof m === 'object' &&
           (m.type === 'human' || m.type === 'ai') &&
           typeof m.content === 'string'
-      )
-        ? (raw as StoredMessage[])
-        : [];
+      );
+      if (!valid && raw.length > 0) {
+        this.logger.warn(
+          `parseStored: invalid array shape (length=${raw.length}), discarding`
+        );
+      }
+      return valid ? (raw as StoredMessage[]) : [];
     }
-    if (typeof raw !== 'string') return [];
+    if (typeof raw !== 'string') {
+      this.logger.warn(
+        `parseStored: unexpected type ${typeof raw}, expected string or array`
+      );
+      return [];
+    }
     try {
       const arr = JSON.parse(raw) as unknown;
       return Array.isArray(arr) ? (arr as StoredMessage[]) : [];
-    } catch {
+    } catch (e) {
+      this.logger.warn(`parseStored: JSON parse failed`, (e as Error)?.message);
       return [];
     }
   }
@@ -66,8 +78,12 @@ export class ConversationMemoryService {
   ): Promise<BaseMessage[]> {
     const key = this.getKey(userId, conversationId);
     const raw = await this.redisCacheService.get(key);
+    const rawType = raw == null ? 'null' : Array.isArray(raw) ? 'array' : typeof raw;
     const stored = this.parseStored(raw as string | ConversationHistory | null);
     const trimmed = stored.slice(-limit);
+    this.logger.debug(
+      `getHistory key=${key} rawType=${rawType} stored=${stored.length} trimmed=${trimmed.length}`
+    );
     return this.toBaseMessages(trimmed);
   }
 
@@ -84,6 +100,7 @@ export class ConversationMemoryService {
     const key = this.getKey(userId, conversationId);
     const raw = await this.redisCacheService.get(key);
     const stored = this.parseStored(raw as string | ConversationHistory | null);
+    const beforeCount = stored.length;
     stored.push({ type: 'human', content: humanContent });
     stored.push({ type: 'ai', content: assistantContent });
     const maxStored =
@@ -98,6 +115,9 @@ export class ConversationMemoryService {
           : Number(ttlRaw) || (ms as (s: string) => number)(String(ttlRaw))
         : DEFAULT_TTL_MS;
     await this.redisCacheService.set(key, JSON.stringify(trimmed), ttl);
+    this.logger.log(
+      `appendTurn key=${key} before=${beforeCount} after=${trimmed.length} ttlMs=${ttl} humanLen=${humanContent.length} assistantLen=${assistantContent.length}`
+    );
   }
 
   public createConversationId(): string {
