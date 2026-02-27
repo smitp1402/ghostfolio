@@ -1,5 +1,5 @@
 @if (canShow) {
-  <div class="gauntlet-widget">
+  <div class="gauntlet-widget" [class.gauntlet-widget-header]="renderInHeader">
     @if (isOpen) {
       <div class="gauntlet-panel" (click)="$event.stopPropagation()">
         <div class="gauntlet-header">
@@ -101,14 +101,26 @@
         </div>
       </div>
     }
-    <button
-      class="gauntlet-fab"
-      mat-fab
-      type="button"
-      (click)="toggle($event)"
-      [attr.aria-label]="isOpen ? 'Close chat' : 'Open chat'"
-    >
-      <ion-icon [name]="isOpen ? 'close-outline' : 'chatbubbles-outline'" />
-    </button>
+    @if (renderInHeader) {
+      <button
+        class="gauntlet-header-trigger h-100 no-min-width px-2"
+        mat-button
+        type="button"
+        (click)="toggle($event)"
+        [attr.aria-label]="isOpen ? 'Close chat' : 'Open chat'"
+      >
+        <ion-icon [name]="isOpen ? 'close-outline' : 'chatbubbles-outline'" />
+      </button>
+    } @else {
+      <button
+        class="gauntlet-fab"
+        mat-fab
+        type="button"
+        (click)="toggle($event)"
+        [attr.aria-label]="isOpen ? 'Close chat' : 'Open chat'"
+      >
+        <ion-icon [name]="isOpen ? 'close-outline' : 'chatbubbles-outline'" />
+      </button>
+    }
   </div>
 }

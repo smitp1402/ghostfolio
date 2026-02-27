@@ -13,6 +13,15 @@
   gap: 0.5rem;
 }
 
+.gauntlet-widget-header {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  align-items: stretch;
+  gap: 0;
+}
+
 .gauntlet-panel {
   width: 28rem;
   max-width: calc(100vw - 3rem);
@@ -26,6 +35,15 @@
   background-color: var(--light-background);
   overflow: hidden;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.gauntlet-widget-header .gauntlet-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 1100;
+  max-width: calc(100vw - 2rem);
+  max-height: min(85vh, calc(100vh - 5rem));
 }
 
 :host-context(.theme-dark) .gauntlet-panel {
@@ -500,4 +518,14 @@
 
 .gauntlet-fab {
   flex-shrink: 0;
+}
+
+.gauntlet-header-trigger {
+  flex-shrink: 0;
+  color: inherit;
+  background-color: transparent;
+}
+
+.gauntlet-header-trigger ion-icon {
+  font-size: 1.5rem;
 }

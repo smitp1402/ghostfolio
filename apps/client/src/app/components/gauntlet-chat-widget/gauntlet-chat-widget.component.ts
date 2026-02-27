@@ -56,6 +56,7 @@ interface SuggestedPrompt {
   templateUrl: './gauntlet-chat-widget.component.html'
 })
 export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
+  @Input() renderInHeader = false;
   @Input() user: User;
 
   public isOpen = false;

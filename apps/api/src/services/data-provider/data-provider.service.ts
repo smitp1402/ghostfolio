@@ -37,6 +37,7 @@ import { groupBy, isEmpty, isNumber, uniqWith } from 'lodash';
 import ms from 'ms';
 
 import { AssetProfileInvalidError } from './errors/asset-profile-invalid.error';
+import { isNetworkError } from './yahoo-finance/yahoo-finance-retry';
 
 @Injectable()
 export class DataProviderService implements OnModuleInit {
@@ -268,6 +269,7 @@ export class DataProviderService implements OnModuleInit {
         }
 
         let assetProfile: Partial<SymbolProfile> = { currency };
+        let assetProfileError: unknown;
 
         try {
           assetProfile = (
@@ -278,7 +280,9 @@ export class DataProviderService implements OnModuleInit {
               }
             ])
           )?.[symbol];
-        } catch {}
+        } catch (error) {
+          assetProfileError = error;
+        }
 
         if (!assetProfile?.name) {
           const assetProfileInImport = assetProfilesWithMarketDataDto?.find(
@@ -295,8 +299,14 @@ export class DataProviderService implements OnModuleInit {
         }
 
         if (!assetProfile?.name) {
+          if (isNetworkError(assetProfileError)) {
+            throw new Error(
+              `${activityPath}.symbol ("${symbol}") could not be validated for data source ("${dataSource}") due to a temporary network error. Please try again.`
+            );
+          }
+
           throw new Error(
-            `activities.${index}.symbol ("${symbol}") is not valid for the specified data source ("${dataSource}")`
+            `${activityPath}.symbol ("${symbol}") is not valid for the specified data source ("${dataSource}")`
           );
         }
 

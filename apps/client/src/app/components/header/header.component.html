@@ -123,6 +123,13 @@
           >About</a
         >
       </li>
+      <li class="list-inline-item">
+        <gf-gauntlet-chat-widget
+          class="d-flex h-100"
+          [renderInHeader]="true"
+          [user]="user"
+        />
+      </li>
       @if (hasPermissionToAccessAssistant) {
         <li class="list-inline-item">
           <button

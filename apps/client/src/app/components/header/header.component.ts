@@ -51,11 +51,14 @@ import {
 import { EMPTY, Subject } from 'rxjs';
 import { catchError, takeUntil } from 'rxjs/operators';
 
+import { GfGauntletChatWidgetComponent } from '../gauntlet-chat-widget/gauntlet-chat-widget.component';
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     GfAssistantComponent,
+    GfGauntletChatWidgetComponent,
     GfLogoComponent,
     GfPremiumIndicatorComponent,
     IonIcon,
