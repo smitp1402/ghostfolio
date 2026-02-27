@@ -8,7 +8,7 @@ import {
   PROPERTY_OPENROUTER_MODEL
 } from '@ghostfolio/common/config';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import {
   AIMessage,
@@ -18,13 +18,17 @@ import {
   ToolMessage
 } from '@langchain/core/messages';
 
+import { ConversationMemoryService } from './memory-system/conversation-memory.service';
 import { getGauntletTools } from './tools/tool.registry';
 
 /** Default OpenRouter model when OPENROUTER_MODEL is not set. Must support tool/function calling. Use a faster model for lower latency. */
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
 
+/** Number of recent messages to include for intent check when conversation has history (last 2 turns). */
+const INTENT_CONTEXT_MESSAGE_LIMIT = 4;
+
 /** Prompt for intent check: is the user asking about portfolio, performance, activities, market history, or report/risk/rules? */
-const INTENT_SYSTEM_PROMPT = `You classify whether a user question is about their own portfolio, investments, holdings, allocation, account summary, portfolio performance over a period (e.g. "how did my portfolio perform this year?", returns, performance since max), portfolio report or rule violations or risk check (e.g. "run my portfolio report", "any rule violations?", "risk check"), transactions, orders, activities (e.g. what they bought or sold), or historical market prices for a symbol (e.g. "price of AAPL on date X") in this app. Reply with exactly one word: Yes or No. No other text.`;
+const INTENT_SYSTEM_PROMPT = `You classify whether a user question is about their own portfolio, investments, holdings, allocation, account summary, portfolio performance over a period (e.g. "how did my portfolio perform this year?", returns, performance since max), portfolio report or rule violations or risk check (e.g. "run my portfolio report", "any rule violations?", "risk check"), transactions, orders, activities (e.g. what they bought or sold), or historical market prices for a symbol (e.g. "price of AAPL on date X") in this app. If the user's message is a short follow-up (e.g. "what about last month?", "and the year before?", "can you break that down?", "explain that") and the preceding messages in the conversation are about portfolio, performance, or other allowed topics above, reply Yes. Reply with exactly one word: Yes or No. No other text.`;
 
 const OFF_TOPIC_MESSAGE =
   'I can only help with questions about your portfolio, performance over time, portfolio report or risk/rule checks, activities, and historical market prices. Try asking things like: "How is my portfolio?", "How did my portfolio perform this year?", "Run my portfolio report", "Any rule violations?", "What did I buy recently?", or "What was the price of AAPL on 2024-01-15?"';
@@ -33,8 +37,11 @@ const SYSTEM_PROMPT = `You are a finance-focused assistant that explains portfol
 
 @Injectable()
 export class GauntletAgentService {
+  private readonly logger = new Logger(GauntletAgentService.name);
+
   public constructor(
     private readonly configurationService: ConfigurationService,
+    private readonly conversationMemoryService: ConversationMemoryService,
     private readonly dataProviderService: DataProviderService,
     private readonly orderService: OrderService,
     private readonly portfolioService: PortfolioService,
@@ -42,14 +49,20 @@ export class GauntletAgentService {
   ) {}
 
   public async chat({
+    conversationId: initialConversationId,
     message,
     userId,
     userCurrency
   }: {
+    conversationId?: string;
     message: string;
     userId: string;
     userCurrency: string;
-  }): Promise<string> {
+  }): Promise<{ text: string; conversationId: string }> {
+    const conversationId =
+      initialConversationId?.trim() ||
+      this.conversationMemoryService.createConversationId();
+
     const apiKeyFromEnv = this.configurationService.get('API_KEY_OPENROUTER');
     const apiKeyFromStore = await this.propertyService.getByKey<string>(
       PROPERTY_API_KEY_OPENROUTER
@@ -66,7 +79,9 @@ export class GauntletAgentService {
       DEFAULT_OPENROUTER_MODEL;
 
     if (!apiKey) {
-      throw new Error('OpenRouter API key is not configured. Set API_KEY_OPENROUTER in .env or in the property store.');
+      throw new Error(
+        'OpenRouter API key is not configured. Set API_KEY_OPENROUTER in .env or in the property store.'
+      );
     }
 
     const llmForIntent = new ChatOpenAI({
@@ -78,9 +93,19 @@ export class GauntletAgentService {
       }
     });
 
-    // Intent check: only run full agent if the question is about the user's portfolio
+    // Intent check: include recent conversation context so follow-ups (e.g. "what about last month?") are classified correctly
+    const intentHistory = await this.conversationMemoryService.getHistory(
+      conversationId,
+      userId,
+      
+      INTENT_CONTEXT_MESSAGE_LIMIT
+    );
+    this.logger.debug(
+      `Intent check: conversationId=${conversationId} fromRequest=${!!initialConversationId?.trim()} historyMessages=${intentHistory.length}`
+    );
     const intentResponse = await llmForIntent.invoke([
       new SystemMessage(INTENT_SYSTEM_PROMPT),
+      ...intentHistory,
       new HumanMessage(message)
     ]);
     const intentText =
@@ -96,7 +121,7 @@ export class GauntletAgentService {
       (intentLower.includes('no') && !intentLower.includes('yes')) ||
       intentLower === 'n';
     if (isOffTopic) {
-      return OFF_TOPIC_MESSAGE;
+      return { text: OFF_TOPIC_MESSAGE, conversationId };
     }
 
     const llm = new ChatOpenAI({
@@ -117,8 +142,13 @@ export class GauntletAgentService {
     );
     const modelWithTools = llm.bindTools(tools);
 
+    const history = await this.conversationMemoryService.getHistory(
+      conversationId,
+      userId
+    );
     const messages: (SystemMessage | HumanMessage | AIMessage | ToolMessage)[] = [
       new SystemMessage(SYSTEM_PROMPT),
+      ...history,
       new HumanMessage(message)
     ];
 
@@ -168,22 +198,35 @@ export class GauntletAgentService {
               .join('')
           : String(response.content ?? '');
 
-    return text.trim() || 'I could not generate a response.';
+    const finalText = text.trim() || 'I could not generate a response.';
+    await this.conversationMemoryService.appendTurn(
+      conversationId,
+      userId,
+      message,
+      finalText
+    );
+    return { text: finalText, conversationId };
   }
 
   /**
    * Same as chat() but streams the final assistant reply token-by-token.
-   * Yields content chunks. Off-topic and static messages are yielded as a single chunk.
+   * Yields { conversationId } first, then content chunks. Off-topic and static messages are yielded as a single chunk.
    */
   public async *chatStream({
+    conversationId: initialConversationId,
     message,
     userId,
     userCurrency
   }: {
+    conversationId?: string;
     message: string;
     userId: string;
     userCurrency: string;
-  }): AsyncGenerator<string> {
+  }): AsyncGenerator<string | { conversationId: string }> {
+    const conversationId =
+      initialConversationId?.trim() ||
+      this.conversationMemoryService.createConversationId();
+
     const apiKeyFromEnv = this.configurationService.get('API_KEY_OPENROUTER');
     const apiKeyFromStore = await this.propertyService.getByKey<string>(
       PROPERTY_API_KEY_OPENROUTER
@@ -204,6 +247,8 @@ export class GauntletAgentService {
       return;
     }
 
+    yield { conversationId };
+
     const llmForIntent = new ChatOpenAI({
       modelName: model as string,
       openAIApiKey: apiKey,
@@ -213,8 +258,17 @@ export class GauntletAgentService {
       }
     });
 
+    const intentHistory = await this.conversationMemoryService.getHistory(
+      conversationId,
+      userId
+     
+    );
+    this.logger.debug(
+      `Intent check (stream): conversationId=${conversationId} fromRequest=${!!initialConversationId?.trim()} historyMessages=${intentHistory.length}`
+    );
     const intentResponse = await llmForIntent.invoke([
       new SystemMessage(INTENT_SYSTEM_PROMPT),
+      ...intentHistory,
       new HumanMessage(message)
     ]);
     const intentText =
@@ -252,8 +306,13 @@ export class GauntletAgentService {
     );
     const modelWithTools = llm.bindTools(tools);
 
+    const history = await this.conversationMemoryService.getHistory(
+      conversationId,
+      userId
+    );
     const messages: (SystemMessage | HumanMessage | AIMessage | ToolMessage)[] = [
       new SystemMessage(SYSTEM_PROMPT),
+      ...history,
       new HumanMessage(message)
     ];
 
@@ -328,6 +387,12 @@ export class GauntletAgentService {
               .join('')
           : String(accumulated.content ?? '');
     const final = text.trim() || 'I could not generate a response.';
+    await this.conversationMemoryService.appendTurn(
+      conversationId,
+      userId,
+      message,
+      final
+    );
     if (final) yield final;
   }
 }

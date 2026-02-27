@@ -51,6 +51,8 @@ export class ConfigurationService {
       ENABLE_FEATURE_STATISTICS: bool({ default: false }),
       ENABLE_FEATURE_SUBSCRIPTION: bool({ default: false }),
       ENABLE_FEATURE_SYSTEM_MESSAGE: bool({ default: false }),
+      GAUNTLET_CONVERSATION_TTL_MS: num({ default: undefined }),
+      GAUNTLET_MAX_STORED_MESSAGES: num({ default: 50 }),
       GOOGLE_CLIENT_ID: str({ default: 'dummyClientId' }),
       GOOGLE_SECRET: str({ default: 'dummySecret' }),
       GOOGLE_SHEETS_ACCOUNT: str({ default: '' }),

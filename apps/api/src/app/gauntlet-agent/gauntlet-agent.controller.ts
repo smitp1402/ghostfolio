@@ -30,17 +30,20 @@ export class GauntletAgentController {
   @Post('chat')
   @HasPermission(permissions.readAiPrompt)
   @UseGuards(AuthGuard('jwt'), HasPermissionGuard)
-  public async chat(@Body() body: ChatDto): Promise<{ text: string }> {
+  public async chat(
+    @Body() body: ChatDto
+  ): Promise<{ text: string; conversationId: string }> {
     const userId = this.request.user.id;
     const userCurrency =
       this.request.user.settings?.settings?.baseCurrency ?? 'USD';
     try {
-      const text = await this.gauntletAgentService.chat({
+      const result = await this.gauntletAgentService.chat({
+        conversationId: body.conversationId,
         message: body.message,
         userId,
         userCurrency
       });
-      return { text };
+      return { text: result.text, conversationId: result.conversationId };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Agent request failed';
@@ -70,19 +73,35 @@ export class GauntletAgentController {
     res.flushHeaders();
 
     try {
-      for await (const chunk of this.gauntletAgentService.chatStream({
+      for await (const value of this.gauntletAgentService.chatStream({
+        conversationId: body.conversationId,
         message: body.message,
         userId,
         userCurrency
       })) {
-        res.write(
-          'data: ' + JSON.stringify({ chunk }) + '\n\n',
-          (err) => {
-            if (err) {
-              console.error('[GauntletAgent] stream write error', err);
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          'conversationId' in value
+        ) {
+          res.write(
+            'data: ' + JSON.stringify({ conversationId: value.conversationId }) + '\n\n',
+            (err) => {
+              if (err) {
+                console.error('[GauntletAgent] stream write error', err);
+              }
             }
-          }
-        );
+          );
+        } else {
+          res.write(
+            'data: ' + JSON.stringify({ chunk: value }) + '\n\n',
+            (err) => {
+              if (err) {
+                console.error('[GauntletAgent] stream write error', err);
+              }
+            }
+          );
+        }
         if (typeof (res as Response & { flush?: () => void }).flush === 'function') {
           (res as Response & { flush: () => void }).flush();
         }

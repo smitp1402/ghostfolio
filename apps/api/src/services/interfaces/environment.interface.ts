@@ -27,6 +27,8 @@ export interface Environment extends CleanedEnvAccessors {
   ENABLE_FEATURE_STATISTICS: boolean;
   ENABLE_FEATURE_SUBSCRIPTION: boolean;
   ENABLE_FEATURE_SYSTEM_MESSAGE: boolean;
+  GAUNTLET_CONVERSATION_TTL_MS?: number;
+  GAUNTLET_MAX_STORED_MESSAGES: number;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_SECRET: string;
   GOOGLE_SHEETS_ACCOUNT: string;

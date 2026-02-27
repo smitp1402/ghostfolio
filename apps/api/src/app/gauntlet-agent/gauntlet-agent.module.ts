@@ -9,11 +9,13 @@ import { Module } from '@nestjs/common';
 
 import { GauntletAgentController } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.controller';
 import { GauntletAgentService } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.service';
+import { ConversationMemoryModule } from '@ghostfolio/api/app/gauntlet-agent/memory-system/conversation-memory.module';
 
 @Module({
   controllers: [GauntletAgentController],
   imports: [
     ConfigurationModule,
+    ConversationMemoryModule,
     DataProviderModule,
     OrderModule,
     PortfolioModule,
