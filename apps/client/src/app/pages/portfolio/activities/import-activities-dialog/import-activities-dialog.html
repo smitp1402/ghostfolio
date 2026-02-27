@@ -2,7 +2,20 @@
   [deviceType]="data.deviceType"
   [title]="dialogTitle"
   (closeButtonClicked)="onCancel()"
-/>
+>
+  @if (mode !== 'DIVIDEND') {
+    <button
+      mat-button
+      color="primary"
+      type="button"
+      class="mr-1"
+      [disabled]="isLoading"
+      (click)="onLoadSampleData(stepper)"
+    >
+      <span i18n>Load sample data</span>
+    </button>
+  }
+</gf-dialog-header>
 
 <div class="flex-grow-1" mat-dialog-content>
   <mat-stepper
@@ -101,17 +114,6 @@
                   >JSON</a
                 >
               </small>
-            </p>
-            <p class="mb-0 mt-2 text-center">
-              <button
-                mat-button
-                color="primary"
-                type="button"
-                [disabled]="isLoading"
-                (click)="onLoadSampleData(stepper)"
-              >
-                <span i18n>Load sample data</span>
-              </button>
             </p>
           </div>
         }

@@ -1,14 +1,37 @@
 <div
-  class="align-items-center container d-flex flex-column h-100 justify-content-center overview p-0 position-relative"
+  class="align-items-center container d-flex flex-column h-100 overview p-0 position-relative"
+  [ngClass]="{
+    'justify-content-center':
+      hasImpersonationId ||
+      !hasPermissionToCreateActivity ||
+      (user?.activitiesCount ?? 0) > 0,
+    'justify-content-start pt-3': !hasImpersonationId && hasPermissionToCreateActivity && user?.activitiesCount === 0
+  }"
 >
   @if (
     !hasImpersonationId &&
     hasPermissionToCreateActivity &&
     user?.activitiesCount === 0
   ) {
-    <div class="justify-content-center row w-100">
-      <div class="col introduction">
-        <h4 i18n>Welcome to Ghostfolio</h4>
+    <div class="row w-100 flex-column flex-grow-1">
+      <div
+        class="align-items-center d-flex justify-content-between w-100 mb-3 px-3"
+      >
+        <h4 class="mb-0" i18n>Welcome to Ghostfolio</h4>
+        <button
+          mat-stroked-button
+          color="primary"
+          [disabled]="isImportingSample"
+          (click)="onLoadSamplePortfolio()"
+        >
+          @if (isImportingSample) {
+            <span i18n>Loading...</span>
+          } @else {
+            <span i18n>Try with sample portfolio</span>
+          }
+        </button>
+      </div>
+      <div class="col introduction d-flex flex-column justify-content-center">
         <p i18n>Ready to take control of your personal finances?</p>
         <ol class="font-weight-bold">
           <li
@@ -60,18 +83,6 @@
               <ng-container i18n>Add activity</ng-container>
             </a>
           }
-          <button
-            mat-stroked-button
-            color="primary"
-            [disabled]="isImportingSample"
-            (click)="onLoadSamplePortfolio()"
-          >
-            @if (isImportingSample) {
-              <span i18n>Loading...</span>
-            } @else {
-              <span i18n>Try with sample portfolio</span>
-            }
-          </button>
         </div>
       </div>
     </div>
