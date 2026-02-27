@@ -138,15 +138,17 @@ export abstract class PortfolioCalculator {
             date = endOfDay(new Date());
           }
 
+          const safe = (v: unknown) =>
+            isNumber(v) && Number.isFinite(v) ? v : 0;
           return {
             SymbolProfile,
             tags,
             type,
             date: format(date, DATE_FORMAT),
-            fee: new Big(feeInAssetProfileCurrency),
-            feeInBaseCurrency: new Big(feeInBaseCurrency),
-            quantity: new Big(quantity),
-            unitPrice: new Big(unitPriceInAssetProfileCurrency)
+            fee: new Big(safe(feeInAssetProfileCurrency)),
+            feeInBaseCurrency: new Big(safe(feeInBaseCurrency)),
+            quantity: new Big(safe(quantity)),
+            unitPrice: new Big(safe(unitPriceInAssetProfileCurrency))
           };
         }
       )

@@ -1,5 +1,6 @@
 import { GfPortfolioPerformanceComponent } from '@ghostfolio/client/components/portfolio-performance/portfolio-performance.component';
 import { LayoutService } from '@ghostfolio/client/core/layout.service';
+import { ImportActivitiesService } from '@ghostfolio/client/services/import-activities.service';
 import { ImpersonationStorageService } from '@ghostfolio/client/services/impersonation-storage.service';
 import { UserService } from '@ghostfolio/client/services/user/user.service';
 import { NUMERICAL_PRECISION_THRESHOLD_6_FIGURES } from '@ghostfolio/common/config';
@@ -23,7 +24,9 @@ import {
   OnInit
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterModule } from '@angular/router';
+import ms from 'ms';
 import { DeviceDetectorService } from 'ngx-device-detector';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -61,6 +64,7 @@ export class GfHomeOverviewComponent implements OnDestroy, OnInit {
   public showDetails = false;
   public unit: string;
   public user: User;
+  public isImportingSample = false;
 
   private unsubscribeSubject = new Subject<void>();
 
@@ -68,8 +72,10 @@ export class GfHomeOverviewComponent implements OnDestroy, OnInit {
     private changeDetectorRef: ChangeDetectorRef,
     private dataService: DataService,
     private deviceService: DeviceDetectorService,
+    private importActivitiesService: ImportActivitiesService,
     private impersonationStorageService: ImpersonationStorageService,
     private layoutService: LayoutService,
+    private snackBar: MatSnackBar,
     private userService: UserService
   ) {
     this.userService.stateChanged
@@ -111,6 +117,48 @@ export class GfHomeOverviewComponent implements OnDestroy, OnInit {
       .subscribe(() => {
         this.update();
       });
+  }
+
+  public async onLoadSamplePortfolio() {
+    if (this.isImportingSample) {
+      return;
+    }
+    this.isImportingSample = true;
+    this.changeDetectorRef.markForCheck();
+    this.snackBar.open('⏳ ' + $localize`Importing sample portfolio...`);
+    try {
+      await this.importActivitiesService.importSamplePortfolio();
+      this.snackBar.open(
+        '✅ ' + $localize`Sample portfolio has been loaded`,
+        undefined,
+        { duration: ms('3 seconds') }
+      );
+      this.userService
+        .get(true)
+        .pipe(takeUntil(this.unsubscribeSubject))
+        .subscribe(() => {
+          this.update();
+          this.changeDetectorRef.markForCheck();
+        });
+    } catch (error: any) {
+      const msg =
+        (Array.isArray(error?.error?.message)
+          ? error.error.message[0]
+          : error?.error?.message) ??
+        error?.message ??
+        $localize`Please try again later.`;
+      console.error('Import failed:', error?.error ?? error);
+      this.snackBar.open(
+        $localize`Import failed` + ': ' + msg,
+        $localize`Okay`,
+        { duration: ms('8 seconds') }
+      );
+      this.changeDetectorRef.markForCheck();
+    } finally {
+      this.isImportingSample = false;
+      this.snackBar.dismiss();
+      this.changeDetectorRef.markForCheck();
+    }
   }
 
   public ngOnDestroy() {

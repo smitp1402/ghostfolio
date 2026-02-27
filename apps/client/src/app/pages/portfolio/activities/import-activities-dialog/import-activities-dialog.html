@@ -102,6 +102,17 @@
                 >
               </small>
             </p>
+            <p class="mb-0 mt-2 text-center">
+              <button
+                mat-button
+                color="primary"
+                type="button"
+                [disabled]="isLoading"
+                (click)="onLoadSampleData(stepper)"
+              >
+                <span i18n>Load sample data</span>
+              </button>
+            </p>
           </div>
         }
       </div>

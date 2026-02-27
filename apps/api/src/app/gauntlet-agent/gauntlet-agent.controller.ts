@@ -23,10 +23,13 @@ export class GauntletAgentController {
   @UseGuards(AuthGuard('jwt'), HasPermissionGuard)
   public async chat(@Body() body: ChatDto): Promise<{ text: string }> {
     const userId = this.request.user.id;
+    const userCurrency =
+      this.request.user.settings?.settings?.baseCurrency ?? 'USD';
     try {
       const text = await this.gauntletAgentService.chat({
         message: body.message,
-        userId
+        userId,
+        userCurrency
       });
       return { text };
     } catch (error) {

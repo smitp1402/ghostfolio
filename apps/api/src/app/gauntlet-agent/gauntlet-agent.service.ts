@@ -1,5 +1,7 @@
+import { OrderService } from '@ghostfolio/api/app/order/order.service';
 import { PortfolioService } from '@ghostfolio/api/app/portfolio/portfolio.service';
 import { ConfigurationService } from '@ghostfolio/api/services/configuration/configuration.service';
+import { DataProviderService } from '@ghostfolio/api/services/data-provider/data-provider.service';
 import { PropertyService } from '@ghostfolio/api/services/property/property.service';
 import {
   PROPERTY_API_KEY_OPENROUTER,
@@ -15,28 +17,32 @@ import { getGauntletTools } from './tools/tool.registry';
 /** Default OpenRouter model when OPENROUTER_MODEL is not set in the property store. Must support tool/function calling. */
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o';
 
-/** Prompt for intent check: is the user asking about their own portfolio/holdings/allocation? */
-const INTENT_SYSTEM_PROMPT = `You classify whether a user question is about their own portfolio, investments, holdings, allocation, or account summary in this app. Reply with exactly one word: Yes or No. No other text.`;
+/** Prompt for intent check: is the user asking about portfolio, activities, or market history? */
+const INTENT_SYSTEM_PROMPT = `You classify whether a user question is about their own portfolio, investments, holdings, allocation, account summary, transactions, orders, activities (e.g. what they bought or sold), or historical market prices for a symbol (e.g. "price of AAPL on date X") in this app. Reply with exactly one word: Yes or No. No other text.`;
 
 const OFF_TOPIC_MESSAGE =
-  'I can only help with questions about your portfolio. Try asking things like: "How is my portfolio?", "What\'s my allocation?", or "Give me a summary of my holdings."';
+  'I can only help with questions about your portfolio, activities, and historical market prices. Try asking things like: "How is my portfolio?", "What did I buy recently?", or "What was the price of AAPL on 2024-01-15?"';
 
-const SYSTEM_PROMPT = `You are a finance-focused assistant that explains portfolio data. You only provide informational answers based on the data you retrieve. You must NOT give buy/sell advice or investment recommendations. If the user asks about their portfolio, allocation, or "how is my portfolio", use the portfolio_details tool to get the data and then summarize it in clear, natural language.`;
+const SYSTEM_PROMPT = `You are a finance-focused assistant that explains portfolio data. You only provide informational answers based on the data you retrieve. You must NOT give buy/sell advice or investment recommendations. If the user asks about their portfolio, allocation, or "how is my portfolio", use the portfolio_details tool to get the data and then summarize it in clear, natural language. If the user asks for recent transactions, list of orders, "what did I buy/sell?", "my activities", or similar, use the activities_list tool and summarize the results. If the user asks for the historical price of a symbol on a date or over a date range (e.g. "What was the price of AAPL on 2024-01-15?", "Historical price for BTC from X to Y"), use the market_historical tool with the symbol, dataSource (e.g. YAHOO for stocks, COINGECKO for crypto), and from/to dates in YYYY-MM-DD.`;
 
 @Injectable()
 export class GauntletAgentService {
   public constructor(
     private readonly configurationService: ConfigurationService,
+    private readonly dataProviderService: DataProviderService,
+    private readonly orderService: OrderService,
     private readonly portfolioService: PortfolioService,
     private readonly propertyService: PropertyService
   ) {}
 
   public async chat({
     message,
-    userId
+    userId,
+    userCurrency
   }: {
     message: string;
     userId: string;
+    userCurrency: string;
   }): Promise<string> {
     const apiKeyFromEnv = this.configurationService.get('API_KEY_OPENROUTER');
     const apiKeyFromStore = await this.propertyService.getByKey<string>(
@@ -96,7 +102,13 @@ export class GauntletAgentService {
       }
     });
 
-    const tools = getGauntletTools(this.portfolioService, userId);
+    const tools = getGauntletTools(
+      this.portfolioService,
+      this.orderService,
+      this.dataProviderService,
+      userId,
+      userCurrency
+    );
     const modelWithTools = llm.bindTools(tools);
 
     const messages: (SystemMessage | HumanMessage | AIMessage | ToolMessage)[] = [
@@ -118,9 +130,14 @@ export class GauntletAgentService {
         const tool = tools.find((t) => t.name === tc.name);
         const args =
           typeof tc.args === 'string' ? JSON.parse(tc.args || '{}') : tc.args ?? {};
+        // DynamicTool expects string input; pass JSON string for market_historical to avoid schema validation error
+        const toolInput =
+          tc.name === 'market_historical'
+            ? JSON.stringify(args)
+            : args;
         let content: string;
         if (tool && typeof (tool as { invoke?: (input: unknown) => Promise<string> }).invoke === 'function') {
-          content = await (tool as { invoke: (input: unknown) => Promise<string> }).invoke(args);
+          content = await (tool as { invoke: (input: unknown) => Promise<string> }).invoke(toolInput);
         } else {
           content = 'Tool not found or not invokable.';
         }

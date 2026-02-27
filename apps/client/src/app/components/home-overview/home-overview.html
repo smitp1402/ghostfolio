@@ -42,7 +42,7 @@
             </a>
           </li>
         </ol>
-        <div class="d-flex justify-content-center">
+        <div class="d-flex flex-column align-items-center gap-2">
           @if (user?.accounts?.length === 1) {
             <a
               color="primary"
@@ -60,6 +60,18 @@
               <ng-container i18n>Add activity</ng-container>
             </a>
           }
+          <button
+            mat-stroked-button
+            color="primary"
+            [disabled]="isImportingSample"
+            (click)="onLoadSamplePortfolio()"
+          >
+            @if (isImportingSample) {
+              <span i18n>Loading...</span>
+            } @else {
+              <span i18n>Try with sample portfolio</span>
+            }
+          </button>
         </div>
       </div>
     </div>

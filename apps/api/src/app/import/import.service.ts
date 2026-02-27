@@ -32,7 +32,7 @@ import {
 } from '@ghostfolio/common/types';
 
 import { Injectable } from '@nestjs/common';
-import { DataSource, Prisma } from '@prisma/client';
+import { DataSource, Prisma, Tag } from '@prisma/client';
 import { Big } from 'big.js';
 import { endOfToday, isAfter, isSameSecond, parseISO } from 'date-fns';
 import { omit, uniqBy } from 'lodash';
@@ -330,9 +330,9 @@ export class ImportService {
       );
 
       for (const tag of tagsDto) {
-        const existingTagOfUser = existingTagsOfUser.find(({ id }) => {
-          return id === tag.id;
-        });
+        const existingTagOfUser = existingTagsOfUser.find(
+          ({ id, name }) => id === tag.id || name === tag.name
+        );
 
         if (!existingTagOfUser || existingTagOfUser.userId !== null) {
           if (!canCreateOwnTag) {
@@ -342,7 +342,10 @@ export class ImportService {
           }
 
           if (!isDryRun) {
-            const existingTag = await this.tagService.getTag({ id: tag.id });
+            let existingTag: Tag | null = null;
+            if (tag.id) {
+              existingTag = await this.tagService.getTag({ id: tag.id });
+            }
             let oldTagId: string;
 
             if (existingTag) {
@@ -350,15 +353,23 @@ export class ImportService {
               delete tag.id;
             }
 
-            const tagObject: Prisma.TagCreateInput = {
-              ...tag,
-              user: { connect: { id: user.id } }
-            };
+            const tagAlreadyExistsForUser =
+              existingTagOfUser?.userId === user.id;
+            if (tagAlreadyExistsForUser) {
+              if (tag.id) {
+                tagIdMapping[tag.id] = existingTagOfUser.id;
+              }
+            } else {
+              const tagObject: Prisma.TagCreateInput = {
+                ...tag,
+                user: { connect: { id: user.id } }
+              };
 
-            const newTag = await this.tagService.createTag(tagObject);
+              const newTag = await this.tagService.createTag(tagObject);
 
-            if (existingTag && oldTagId) {
-              tagIdMapping[oldTagId] = newTag.id;
+              if (existingTag && oldTagId) {
+                tagIdMapping[oldTagId] = newTag.id;
+              }
             }
           }
         }

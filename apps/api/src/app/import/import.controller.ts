@@ -7,6 +7,9 @@ import { ImportResponse } from '@ghostfolio/common/interfaces';
 import { hasPermission, permissions } from '@ghostfolio/common/permissions';
 import type { RequestWithUser } from '@ghostfolio/common/types';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   Body,
   Controller,
@@ -35,6 +38,22 @@ export class ImportController {
     private readonly importService: ImportService,
     @Inject(REQUEST) private readonly request: RequestWithUser
   ) {}
+
+  @Get('sample')
+  @UseGuards(AuthGuard('jwt'))
+  public getSample(): Record<string, unknown> {
+    const path = join(process.cwd(), 'test/import/ok/sample-rich.json');
+    try {
+      const raw = readFileSync(path, 'utf-8');
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch (err) {
+      Logger.error(err, ImportController);
+      throw new HttpException(
+        getReasonPhrase(StatusCodes.INTERNAL_SERVER_ERROR),
+        StatusCodes.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), HasPermissionGuard)

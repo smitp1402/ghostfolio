@@ -264,6 +264,52 @@ export class GfImportActivitiesDialogComponent implements OnDestroy {
     aStepper.reset();
   }
 
+  public async onLoadSampleData(stepper: MatStepper) {
+    this.snackBar.open('⏳ ' + $localize`Validating data...`);
+    this.isLoading = true;
+    this.changeDetectorRef.markForCheck();
+    try {
+      const { accounts, activities, assetProfiles, tags } =
+        await this.importActivitiesService.getSamplePortfolio();
+
+      this.accounts = accounts;
+      this.assetProfiles = assetProfiles;
+      this.tags = tags;
+
+      const { activities: validatedActivities } =
+        await this.importActivitiesService.importJson({
+          accounts,
+          activities,
+          assetProfiles,
+          isDryRun: true,
+          tags
+        });
+
+      this.activities = validatedActivities;
+      this.dataSource = new MatTableDataSource(
+        [...validatedActivities].reverse()
+      );
+      this.pageIndex = 0;
+      this.totalItems = validatedActivities.length;
+      this.importStep = ImportStep.SELECT_ACTIVITIES;
+      this.updateSelection(this.activities);
+      stepper.next();
+    } catch (error: any) {
+      console.error(error);
+      const message = Array.isArray(error?.error?.message)
+        ? error.error.message
+        : [error?.message ?? error?.error?.message ?? 'Unknown error'];
+      this.handleImportError({
+        activities: [],
+        error: { error: { message } }
+      });
+    } finally {
+      this.isLoading = false;
+      this.snackBar.dismiss();
+      this.changeDetectorRef.markForCheck();
+    }
+  }
+
   public onSelectFile(stepper: MatStepper) {
     const input = document.createElement('input');
     input.accept = 'application/JSON, .csv';

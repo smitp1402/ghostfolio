@@ -10,7 +10,7 @@ import { Activity } from '@ghostfolio/common/interfaces';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Account, DataSource, Type as ActivityType } from '@prisma/client';
-import { isFinite } from 'lodash';
+import { isArray, isFinite } from 'lodash';
 import { parse as csvToJson } from 'papaparse';
 import { EMPTY } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -36,6 +36,61 @@ export class ImportActivitiesService {
   ];
 
   public constructor(private http: HttpClient) {}
+
+  /**
+   * Fetches and returns the sample portfolio data (accounts, assetProfiles, tags, activities).
+   * Activity ids are stripped so the payload is ready for import.
+   */
+  public getSamplePortfolio(): Promise<{
+    accounts: CreateAccountWithBalancesDto[];
+    activities: CreateOrderDto[];
+    assetProfiles: CreateAssetProfileWithMarketDataDto[];
+    tags: CreateTagDto[];
+  }> {
+    return new Promise((resolve, reject) => {
+      this.http
+        .get<{
+          accounts?: CreateAccountWithBalancesDto[];
+          activities: CreateOrderDto[];
+          assetProfiles?: CreateAssetProfileWithMarketDataDto[];
+          tags?: CreateTagDto[];
+        }>('/api/v1/import/sample')
+        .pipe(catchError((err) => { reject(err); return EMPTY; }))
+        .subscribe({
+          next: (content) => {
+            if (!isArray(content.activities)) {
+              reject(new Error('Sample portfolio has invalid activities'));
+              return;
+            }
+            const activities = content.activities.map((activity) => {
+              const { id, ...rest } = activity as CreateOrderDto & { id?: string };
+              return rest;
+            });
+            resolve({
+              accounts: content.accounts ?? [],
+              activities,
+              assetProfiles: content.assetProfiles ?? [],
+              tags: content.tags ?? []
+            });
+          }
+        });
+    });
+  }
+
+  /**
+   * Imports the sample portfolio in one go (creates accounts, asset profiles, and activities).
+   */
+  public async importSamplePortfolio(): Promise<{ activities: Activity[] }> {
+    const { accounts, activities, assetProfiles, tags } =
+      await this.getSamplePortfolio();
+    return this.importJson({
+      accounts,
+      activities,
+      assetProfiles,
+      tags,
+      isDryRun: false
+    });
+  }
 
   public async importCsv({
     fileContent,
