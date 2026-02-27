@@ -1,5 +1,11 @@
+import {
+  HEADER_KEY_IMPERSONATION,
+  HEADER_KEY_TOKEN
+} from '@ghostfolio/common/config';
 import { hasPermission, permissions } from '@ghostfolio/common/permissions';
 import { User } from '@ghostfolio/common/interfaces';
+import { ImpersonationStorageService } from '@ghostfolio/client/services/impersonation-storage.service';
+import { TokenStorageService } from '@ghostfolio/client/services/token-storage.service';
 
 import {
   ChangeDetectionStrategy,
@@ -12,7 +18,6 @@ import {
   OnInit
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -21,7 +26,6 @@ import { MarkdownComponent } from 'ngx-markdown';
 import { addIcons } from 'ionicons';
 import { chatbubblesOutline, closeOutline, sendOutline } from 'ionicons/icons';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 
 export interface ChatMessage {
   id: string;
@@ -59,7 +63,8 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
   public constructor(
     private changeDetectorRef: ChangeDetectorRef,
     private elementRef: ElementRef<HTMLElement>,
-    private http: HttpClient
+    private impersonationStorageService: ImpersonationStorageService,
+    private tokenStorageService: TokenStorageService
   ) {
     addIcons({ chatbubblesOutline, closeOutline, sendOutline });
   }
@@ -117,35 +122,105 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
     this.isLoading = true;
     this.changeDetectorRef.markForCheck();
 
-    this.http
-      .post<{ text: string }>('/api/v1/gauntlet-agent/chat', { message: text })
-      .pipe(takeUntil(this.unsubscribeSubject))
-      .subscribe({
-        next: (res) => {
-          const assistantMsg: ChatMessage = {
-            id: `msg-${++this.nextId}`,
-            role: 'assistant',
-            text: res?.text ?? '',
-            timestamp: new Date()
-          };
-          this.messages = [...this.messages, assistantMsg];
-          this.isLoading = false;
-          this.changeDetectorRef.markForCheck();
-        },
-        error: (err) => {
-          const message =
-            err?.error?.error ?? err?.message ?? $localize`Request failed`;
-          this.error = message;
-          const assistantMsg: ChatMessage = {
-            id: `msg-${++this.nextId}`,
-            role: 'assistant',
-            text: 'Error: ' + message,
-            timestamp: new Date()
-          };
-          this.messages = [...this.messages, assistantMsg];
-          this.isLoading = false;
-          this.changeDetectorRef.markForCheck();
+    const assistantMsg: ChatMessage = {
+      id: `msg-${++this.nextId}`,
+      role: 'assistant',
+      text: '',
+      timestamp: new Date()
+    };
+    this.messages = [...this.messages, assistantMsg];
+    this.changeDetectorRef.markForCheck();
+
+    const token = this.tokenStorageService.getToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token !== null) {
+      headers[HEADER_KEY_TOKEN] = `Bearer ${token}`;
+      const impersonationId = this.impersonationStorageService.getId();
+      if (impersonationId !== null) {
+        headers[HEADER_KEY_IMPERSONATION] = impersonationId;
+      }
+    }
+
+    fetch('/api/v1/gauntlet-agent/chat/stream', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ message: text })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(
+            (errBody as { error?: string })?.error ?? response.statusText
+          );
         }
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6)) as {
+                  chunk?: string;
+                  error?: string;
+                };
+                if (data.error) {
+                  assistantMsg.text =
+                    (assistantMsg.text || '') + `Error: ${data.error}`;
+                  this.changeDetectorRef.markForCheck();
+                  break;
+                }
+                if (typeof data.chunk === 'string') {
+                  assistantMsg.text += data.chunk;
+                  this.changeDetectorRef.markForCheck();
+                }
+              } catch {
+                // ignore parse errors for incomplete lines
+              }
+            }
+          }
+        }
+        if (buffer.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(buffer.slice(6)) as {
+              chunk?: string;
+              error?: string;
+            };
+            if (data.error) {
+              assistantMsg.text =
+                (assistantMsg.text || '') + `Error: ${data.error}`;
+            } else if (typeof data.chunk === 'string') {
+              assistantMsg.text += data.chunk;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      })
+      .catch((err) => {
+        const message =
+          err?.message ?? $localize`Request failed`;
+        this.error = message;
+        assistantMsg.text = assistantMsg.text
+          ? assistantMsg.text + '\n\nError: ' + message
+          : 'Error: ' + message;
+      })
+      .finally(() => {
+        if (!assistantMsg.text) {
+          assistantMsg.text = $localize`No response received.`;
+        }
+        this.isLoading = false;
+        this.changeDetectorRef.markForCheck();
       });
   }
 }

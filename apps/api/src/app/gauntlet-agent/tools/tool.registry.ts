@@ -7,11 +7,13 @@ import type { DynamicTool } from '@langchain/core/tools';
 import { createActivitiesListTool } from './activities-list.tool';
 import { createMarketHistoricalTool } from './market-historical.tool';
 import { createPortfolioDetailsTool } from './portfolio-details.tool';
+import { createPortfolioPerformanceTool } from './portfolio-performance.tool';
+import { createPortfolioReportTool } from './portfolio-report.tool';
 
 /**
  * Builds and returns the LangChain tools for the Gauntlet agent.
  * userId and userCurrency are bound so the tool executor can call
- * PortfolioService.getDetails, OrderService.getOrders, and DataProviderService.getHistorical for the authenticated user.
+ * PortfolioService.getDetails/getPerformance/getReport, OrderService.getOrders, and DataProviderService.getHistorical for the authenticated user.
  */
 export function getGauntletTools(
   portfolioService: PortfolioService,
@@ -22,6 +24,8 @@ export function getGauntletTools(
 ): DynamicTool[] {
   return [
     createPortfolioDetailsTool(portfolioService, userId),
+    createPortfolioPerformanceTool(portfolioService, userId),
+    createPortfolioReportTool(portfolioService, userId),
     createActivitiesListTool(orderService, userId, userCurrency),
     createMarketHistoricalTool(dataProviderService)
   ];
