@@ -7,6 +7,10 @@ import {
   UNKNOWN_KEY
 } from '@ghostfolio/common/config';
 import { isCurrency } from '@ghostfolio/common/helper';
+import {
+  isNetworkError,
+  withRetryOnNetworkError
+} from '@ghostfolio/api/services/data-provider/yahoo-finance/yahoo-finance-retry';
 
 import { Injectable, Logger } from '@nestjs/common';
 import {
@@ -163,6 +167,14 @@ export class YahooFinanceDataEnhancerService implements DataEnhancerInterface {
   public async getAssetProfile(
     aSymbol: string
   ): Promise<Partial<SymbolProfile>> {
+    return withRetryOnNetworkError(() =>
+      this.fetchAssetProfile(aSymbol)
+    );
+  }
+
+  private async fetchAssetProfile(
+    aSymbol: string
+  ): Promise<Partial<SymbolProfile>> {
     let response: Partial<SymbolProfile> = {};
 
     try {
@@ -259,13 +271,15 @@ export class YahooFinanceDataEnhancerService implements DataEnhancerInterface {
     } catch (error) {
       response = undefined;
 
-      if (error.message === `Quote not found for symbol: ${aSymbol}`) {
+      if ((error as Error)?.message === `Quote not found for symbol: ${aSymbol}`) {
         throw new AssetProfileDelistedError(
           `No data found, ${aSymbol} (${this.getName()}) may be delisted`
         );
-      } else {
-        Logger.error(error, 'YahooFinanceService');
       }
+      if (isNetworkError(error)) {
+        throw error;
+      }
+      Logger.error(error, 'YahooFinanceService');
     }
 
     return response;

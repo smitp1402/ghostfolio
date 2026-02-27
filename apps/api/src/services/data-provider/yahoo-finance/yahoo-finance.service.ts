@@ -25,6 +25,7 @@ import { addDays, format, isSameDay } from 'date-fns';
 import { uniqBy } from 'lodash';
 import YahooFinance from 'yahoo-finance2';
 import { ChartResultArray } from 'yahoo-finance2/esm/src/modules/chart';
+import { withRetryOnNetworkError } from './yahoo-finance-retry';
 import {
   HistoricalDividendsResult,
   HistoricalHistoryResult
@@ -193,20 +194,22 @@ export class YahooFinanceService implements DataProviderInterface {
     );
 
     try {
-      let quotes: Price[] | Quote[] = [];
+      const fetchQuotes = async (): Promise<Price[] | Quote[]> => {
+        try {
+          return await this.yahooFinance.quote(yahooFinanceSymbols);
+        } catch (error) {
+          Logger.error(error, 'YahooFinanceService');
 
-      try {
-        quotes = await this.yahooFinance.quote(yahooFinanceSymbols);
-      } catch (error) {
-        Logger.error(error, 'YahooFinanceService');
+          Logger.warn(
+            'Fallback to yahooFinance.quoteSummary()',
+            'YahooFinanceService'
+          );
 
-        Logger.warn(
-          'Fallback to yahooFinance.quoteSummary()',
-          'YahooFinanceService'
-        );
+          return await this.getQuotesWithQuoteSummary(yahooFinanceSymbols);
+        }
+      };
 
-        quotes = await this.getQuotesWithQuoteSummary(yahooFinanceSymbols);
-      }
+      const quotes = await withRetryOnNetworkError(fetchQuotes);
 
       for (const quote of quotes) {
         // Convert symbols back
