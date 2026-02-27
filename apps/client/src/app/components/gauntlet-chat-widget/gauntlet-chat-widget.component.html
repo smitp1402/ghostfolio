@@ -4,24 +4,52 @@
       <div class="gauntlet-panel" (click)="$event.stopPropagation()">
         <div class="gauntlet-header">
           <div class="gauntlet-header-title">
-            <ion-icon name="chatbubbles-outline" />
-            <span i18n>Portfolio assistant</span>
+            <span class="gauntlet-header-title-icon-wrap" aria-hidden="true">
+              <ion-icon class="gauntlet-header-title-icon" name="sparkles-outline" />
+            </span>
+            <span i18n>AI Finance Agent</span>
           </div>
-          <button
-            class="gauntlet-close"
-            mat-icon-button
-            type="button"
-            (click)="close()"
-            [attr.aria-label]="'Close'"
-          >
-            <ion-icon name="close-outline" />
-          </button>
+          <div class="gauntlet-header-actions">
+            <button
+              class="gauntlet-suggestions-toggle"
+              [class.gauntlet-suggestions-toggle-attention]="!showSuggestedPrompts && !isLoading"
+              mat-stroked-button
+              type="button"
+              (click)="toggleSuggestedPrompts($event)"
+              [disabled]="isLoading"
+            >
+              {{ showSuggestedPrompts ? 'Hide queries' : 'Suggested queries' }}
+            </button>
+            <button
+              class="gauntlet-close"
+              mat-icon-button
+              type="button"
+              (click)="close()"
+              [attr.aria-label]="'Close'"
+            >
+              <ion-icon name="close-outline" />
+            </button>
+          </div>
         </div>
         <div class="gauntlet-messages">
           @if (messages.length === 0) {
             <p class="gauntlet-placeholder" i18n>
-              Ask about your portfolio, e.g. "What's my allocation?" or "How is my portfolio?"
+              This finance assistant helps you understand your investments with clear, context-aware guidance on portfolio health, performance trends, recent activity, and potential risk or rule concerns.
             </p>
+          }
+          @if (showSuggestedPrompts) {
+            <div class="gauntlet-suggestions">
+              @for (suggestion of suggestedPrompts; track suggestion.query) {
+                <button
+                  class="gauntlet-suggestion"
+                  type="button"
+                  (click)="useSuggestedPrompt(suggestion.query)"
+                  [disabled]="isLoading"
+                >
+                  {{ suggestion.query }}
+                </button>
+              }
+            </div>
           }
           @for (msg of messages; track msg.id) {
             <div

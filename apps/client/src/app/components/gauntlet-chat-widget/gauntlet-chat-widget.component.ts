@@ -20,11 +20,15 @@ import {
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { IonIcon } from '@ionic/angular/standalone';
 import { MarkdownComponent } from 'ngx-markdown';
 import { addIcons } from 'ionicons';
-import { chatbubblesOutline, closeOutline, sendOutline } from 'ionicons/icons';
+import {
+  chatbubblesOutline,
+  closeOutline,
+  sendOutline,
+  sparklesOutline
+} from 'ionicons/icons';
 import { Subject } from 'rxjs';
 
 export interface ChatMessage {
@@ -34,6 +38,10 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+interface SuggestedPrompt {
+  query: string;
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -41,7 +49,6 @@ export interface ChatMessage {
     FormsModule,
     MatButtonModule,
     MarkdownComponent,
-    MatProgressSpinnerModule,
     IonIcon
   ],
   selector: 'gf-gauntlet-chat-widget',
@@ -55,9 +62,29 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
   public messages: ChatMessage[] = [];
   public inputMessage = '';
   public isLoading = false;
+  public showSuggestedPrompts = true;
   public error: string | null = null;
+  public suggestedPrompts: SuggestedPrompt[] = [
+    {
+      query: 'Show my current portfolio allocation and top holdings.'
+    },
+    {
+      query: 'How did my portfolio perform this year?'
+    },
+    {
+      query: 'Run my portfolio report and tell me if there are any rule violations.'
+    },
+    {
+      query: 'What did I buy and sell in my last 10 activities?'
+    },
+    {
+      query:
+        'Give me my portfolio performance this year, run a portfolio report, and summarize my last 5 activities.'
+    }
+  ];
 
   private nextId = 0;
+  private conversationId: string | null = null;
   private unsubscribeSubject = new Subject<void>();
 
   public constructor(
@@ -66,7 +93,12 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
     private impersonationStorageService: ImpersonationStorageService,
     private tokenStorageService: TokenStorageService
   ) {
-    addIcons({ chatbubblesOutline, closeOutline, sendOutline });
+    addIcons({
+      chatbubblesOutline,
+      closeOutline,
+      sendOutline,
+      sparklesOutline
+    });
   }
 
   public get canShow(): boolean {
@@ -94,13 +126,33 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
   public toggle(event?: Event): void {
     event?.stopPropagation();
     this.isOpen = !this.isOpen;
+    if (this.isOpen) {
+      this.showSuggestedPrompts = true;
+    }
     this.error = null;
     this.changeDetectorRef.markForCheck();
   }
 
   public close(): void {
     this.isOpen = false;
+    this.showSuggestedPrompts = false;
+    this.conversationId = null;
     this.changeDetectorRef.markForCheck();
+  }
+
+  public toggleSuggestedPrompts(event?: Event): void {
+    event?.stopPropagation();
+    this.showSuggestedPrompts = !this.showSuggestedPrompts;
+    this.changeDetectorRef.markForCheck();
+  }
+
+  public useSuggestedPrompt(query: string): void {
+    if (this.isLoading) {
+      return;
+    }
+
+    this.inputMessage = query;
+    this.send();
   }
 
   public send(): void {
@@ -146,7 +198,10 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
     fetch('/api/v1/gauntlet-agent/chat/stream', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify({
+        conversationId: this.conversationId ?? undefined,
+        message: text
+      })
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -172,6 +227,7 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
               try {
                 const data = JSON.parse(line.slice(6)) as {
                   chunk?: string;
+                  conversationId?: string;
                   error?: string;
                 };
                 if (data.error) {
@@ -179,6 +235,10 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
                     (assistantMsg.text || '') + `Error: ${data.error}`;
                   this.changeDetectorRef.markForCheck();
                   break;
+                }
+                if (typeof data.conversationId === 'string') {
+                  this.conversationId = data.conversationId;
+                  continue;
                 }
                 if (typeof data.chunk === 'string') {
                   assistantMsg.text += data.chunk;
@@ -194,11 +254,14 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
           try {
             const data = JSON.parse(buffer.slice(6)) as {
               chunk?: string;
+              conversationId?: string;
               error?: string;
             };
             if (data.error) {
               assistantMsg.text =
                 (assistantMsg.text || '') + `Error: ${data.error}`;
+            } else if (typeof data.conversationId === 'string') {
+              this.conversationId = data.conversationId;
             } else if (typeof data.chunk === 'string') {
               assistantMsg.text += data.chunk;
             }

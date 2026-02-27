@@ -6,7 +6,6 @@ import type { RequestWithUser } from '@ghostfolio/common/types';
 import {
   Body,
   Controller,
-  HttpException,
   Inject,
   Post,
   Res,
@@ -14,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { StatusCodes } from 'http-status-codes';
 import type { Response } from 'express';
 
 import { GauntletAgentService } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.service';
@@ -27,6 +25,7 @@ export class GauntletAgentController {
     @Inject(REQUEST) private readonly request: RequestWithUser
   ) {}
 
+  /*
   @Post('chat')
   @HasPermission(permissions.readAiPrompt)
   @UseGuards(AuthGuard('jwt'), HasPermissionGuard)
@@ -55,6 +54,7 @@ export class GauntletAgentController {
       );
     }
   }
+  */
 
   @Post('chat/stream')
   @HasPermission(permissions.readAiPrompt)
