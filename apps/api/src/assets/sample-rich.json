@@ -191,32 +191,8 @@
       "symbol": "BTCUSD",
       "tags": []
     },
-    {
-      "accountId": "b2d3fe1d-d6a8-41a3-be39-07ef5e9480f0",
-      "comment": null,
-      "fee": 0,
-      "quantity": 2,
-      "type": "BUY",
-      "unitPrice": 75.8,
-      "currency": "CHF",
-      "dataSource": "YAHOO",
-      "date": "2022-03-07T00:00:00.000Z",
-      "symbol": "NOVN.SW",
-      "tags": []
-    },
-    {
-      "accountId": "b2d3fe1d-d6a8-41a3-be39-07ef5e9480f0",
-      "comment": null,
-      "fee": 0,
-      "quantity": 2,
-      "type": "SELL",
-      "unitPrice": 85.73,
-      "currency": "CHF",
-      "dataSource": "YAHOO",
-      "date": "2022-04-08T00:00:00.000Z",
-      "symbol": "NOVN.SW",
-      "tags": []
-    },
+
+
     {
       "accountId": "b2d3fe1d-d6a8-41a3-be39-07ef5e9480f0",
       "comment": null,

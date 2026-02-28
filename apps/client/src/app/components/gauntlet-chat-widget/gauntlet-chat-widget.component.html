@@ -21,6 +21,16 @@
               {{ showSuggestedPrompts ? 'Hide queries' : 'Suggested queries' }}
             </button>
             <button
+              class="gauntlet-suggestions-toggle"
+              mat-stroked-button
+              type="button"
+              (click)="startNewChat($event)"
+              [disabled]="isLoading"
+              i18n
+            >
+              New chat
+            </button>
+            <button
               class="gauntlet-close"
               mat-icon-button
               type="button"

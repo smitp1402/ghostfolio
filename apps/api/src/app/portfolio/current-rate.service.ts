@@ -124,7 +124,11 @@ export class CurrentRateService {
         try {
           // If missing quote, fallback to the latest available historical market price
           let value: GetValueObject = response.values.find((currentValue) => {
-            return currentValue.symbol === symbol && isToday(currentValue.date);
+            return (
+              currentValue.dataSource === dataSource &&
+              currentValue.symbol === symbol &&
+              isToday(currentValue.date)
+            );
           });
 
           if (!value) {
@@ -146,7 +150,11 @@ export class CurrentRateService {
 
           const [latestValue] = response.values
             .filter((currentValue) => {
-              return currentValue.symbol === symbol && currentValue.marketPrice;
+              return (
+                currentValue.dataSource === dataSource &&
+                currentValue.symbol === symbol &&
+                currentValue.marketPrice
+              );
             })
             .sort((a, b) => {
               if (a.date < b.date) {

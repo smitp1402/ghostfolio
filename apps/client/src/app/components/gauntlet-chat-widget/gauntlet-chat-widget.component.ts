@@ -14,6 +14,7 @@ import {
   ElementRef,
   HostListener,
   Input,
+  NgZone,
   OnDestroy,
   OnInit
 } from '@angular/core';
@@ -88,6 +89,7 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
     private changeDetectorRef: ChangeDetectorRef,
     private elementRef: ElementRef<HTMLElement>,
     private impersonationStorageService: ImpersonationStorageService,
+    private ngZone: NgZone,
     private tokenStorageService: TokenStorageService
   ) {
     addIcons({
@@ -133,7 +135,20 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
   public close(): void {
     this.isOpen = false;
     this.showSuggestedPrompts = false;
+    this.changeDetectorRef.markForCheck();
+  }
+
+  public startNewChat(event?: Event): void {
+    event?.stopPropagation();
+    if (this.isLoading) {
+      return;
+    }
+    this.messages = [];
+    this.inputMessage = '';
+    this.error = null;
     this.conversationId = null;
+    this.nextId = 0;
+    this.showSuggestedPrompts = true;
     this.changeDetectorRef.markForCheck();
   }
 
@@ -228,18 +243,22 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
                   error?: string;
                 };
                 if (data.error) {
-                  assistantMsg.text =
-                    (assistantMsg.text || '') + `Error: ${data.error}`;
-                  this.changeDetectorRef.markForCheck();
+                  this.runInAngular(() => {
+                    assistantMsg.text =
+                      (assistantMsg.text || '') + `Error: ${data.error}`;
+                  });
                   break;
                 }
                 if (typeof data.conversationId === 'string') {
-                  this.conversationId = data.conversationId;
+                  this.runInAngular(() => {
+                    this.conversationId = data.conversationId!;
+                  });
                   continue;
                 }
                 if (typeof data.chunk === 'string') {
-                  assistantMsg.text += data.chunk;
-                  this.changeDetectorRef.markForCheck();
+                  this.runInAngular(() => {
+                    assistantMsg.text += data.chunk!;
+                  });
                 }
               } catch {
                 // ignore parse errors for incomplete lines
@@ -255,12 +274,18 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
               error?: string;
             };
             if (data.error) {
-              assistantMsg.text =
-                (assistantMsg.text || '') + `Error: ${data.error}`;
+              this.runInAngular(() => {
+                assistantMsg.text =
+                  (assistantMsg.text || '') + `Error: ${data.error}`;
+              });
             } else if (typeof data.conversationId === 'string') {
-              this.conversationId = data.conversationId;
+              this.runInAngular(() => {
+                this.conversationId = data.conversationId!;
+              });
             } else if (typeof data.chunk === 'string') {
-              assistantMsg.text += data.chunk;
+              this.runInAngular(() => {
+                assistantMsg.text += data.chunk!;
+              });
             }
           } catch {
             // ignore
@@ -270,17 +295,27 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
       .catch((err) => {
         const message =
           err?.message ?? $localize`Request failed`;
-        this.error = message;
-        assistantMsg.text = assistantMsg.text
-          ? assistantMsg.text + '\n\nError: ' + message
-          : 'Error: ' + message;
+        this.runInAngular(() => {
+          this.error = message;
+          assistantMsg.text = assistantMsg.text
+            ? assistantMsg.text + '\n\nError: ' + message
+            : 'Error: ' + message;
+        });
       })
       .finally(() => {
-        if (!assistantMsg.text) {
-          assistantMsg.text = $localize`No response received.`;
-        }
-        this.isLoading = false;
-        this.changeDetectorRef.markForCheck();
+        this.runInAngular(() => {
+          if (!assistantMsg.text) {
+            assistantMsg.text = $localize`No response received.`;
+          }
+          this.isLoading = false;
+        });
       });
+  }
+
+  private runInAngular(work: () => void): void {
+    this.ngZone.run(() => {
+      work();
+      this.changeDetectorRef.markForCheck();
+    });
   }
 }

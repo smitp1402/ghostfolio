@@ -6,3 +6,14 @@ export interface StoredMessage {
 
 /** Conversation history as stored in Redis. */
 export type ConversationHistory = StoredMessage[];
+
+export type IntentLabel = 'on_topic' | 'off_topic' | 'uncertain';
+
+/** Small session state used by intent gating. */
+export interface ConversationIntentState {
+  lastIntent: IntentLabel;
+  lastToolUsed?: string;
+  recentEntities: string[];
+  pendingClarification: boolean;
+  updatedAt: string;
+}

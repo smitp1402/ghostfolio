@@ -1,6 +1,6 @@
 import { DataProviderService } from '@ghostfolio/api/services/data-provider/data-provider.service';
 import { DataSource } from '@prisma/client';
-import { parseISO, isValid } from 'date-fns';
+import { endOfMonth, endOfYear, isValid, parseISO } from 'date-fns';
 import { z } from 'zod';
 
 import { DynamicTool } from '@langchain/core/tools';
@@ -15,10 +15,36 @@ const marketHistoricalSchema = z.object({
   to: z.string()
 });
 
+function parseFlexibleDate(input: string, boundary: 'start' | 'end'): Date | null {
+  const value = input.trim();
+  // Accept year-only for convenience (e.g. "2020")
+  if (/^\d{4}$/.test(value)) {
+    const yearStart = parseISO(`${value}-01-01`);
+    if (!isValid(yearStart)) {
+      return null;
+    }
+    return boundary === 'start' ? yearStart : endOfYear(yearStart);
+  }
+  // Accept year-month (e.g. "2020-06")
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const monthStart = parseISO(`${value}-01`);
+    if (!isValid(monthStart)) {
+      return null;
+    }
+    return boundary === 'start' ? monthStart : endOfMonth(monthStart);
+  }
+  // Accept full date (e.g. "2020-06-15")
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const fullDate = parseISO(value);
+    return isValid(fullDate) ? fullDate : null;
+  }
+  return null;
+}
+
 /**
  * Builds the market_historical LangChain tool. Returns historical market price
  * data for a symbol over a date range. Uses DynamicTool with Zod validation
- * so the LLM is prompted to pass symbol, dataSource, from, to (YYYY-MM-DD).
+ * so the LLM is prompted to pass symbol, dataSource, and from/to dates.
  */
 export function createMarketHistoricalTool(
   dataProviderService: DataProviderService
@@ -26,7 +52,7 @@ export function createMarketHistoricalTool(
   return new DynamicTool({
     name: 'market_historical',
     description:
-      'Use when the user asks for the historical price of a symbol on a date or over a date range, e.g. "What was the price of X on date D?", "Historical price for symbol Y from A to B", "Price of AAPL on 2024-01-15". Pass a JSON object with required fields: symbol (string), dataSource (string; e.g. YAHOO, COINGECKO), from (YYYY-MM-DD), to (YYYY-MM-DD).',
+      'Use when the user asks for the historical price of a symbol on a date or over a date range, e.g. "What was the price of X on date D?", "Historical price for symbol Y from A to B", "Price of AAPL on 2024-01-15", "Report of MSFT in 2012". Pass a JSON object with required fields: symbol (string), dataSource (string; e.g. YAHOO, COINGECKO), from/to as YYYY, YYYY-MM, or YYYY-MM-DD.',
     func: async (input: unknown): Promise<string> => {
       try {
         const raw =
@@ -36,14 +62,14 @@ export function createMarketHistoricalTool(
           const msg = parsed.error.errors
             .map((e) => `${e.path.join('.')}: ${e.message}`)
             .join('; ');
-          return `Error: Invalid arguments. ${msg}. Required: symbol, dataSource, from, to (YYYY-MM-DD).`;
+          return `Error: Invalid arguments. ${msg}. Required: symbol, dataSource, from, to (date format YYYY, YYYY-MM, or YYYY-MM-DD).`;
         }
         const { symbol, dataSource, from, to } = parsed.data;
 
-        const fromDate = parseISO(from);
-        const toDate = parseISO(to);
-        if (!isValid(fromDate) || !isValid(toDate)) {
-          return 'Error: Invalid date format. Use YYYY-MM-DD for from and to.';
+        const fromDate = parseFlexibleDate(from, 'start');
+        const toDate = parseFlexibleDate(to, 'end');
+        if (!fromDate || !toDate) {
+          return 'Error: Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD for from and to.';
         }
         if (fromDate > toDate) {
           return 'Error: from date must be before or equal to to date.';
@@ -65,13 +91,42 @@ export function createMarketHistoricalTool(
           return `No historical data found for symbol ${symbol} and date range ${from} to ${to}.`;
         }
 
-        const lines = Object.entries(bySymbol)
+        const entries = Object.entries(bySymbol)
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(
-            ([date, data]) =>
-              `${symbol}: ${date} -> ${data?.marketPrice ?? 'N/A'}`
-          );
-        return lines.join('\n');
+          .map(([date, data]) => ({
+            date,
+            price: Number(data?.marketPrice)
+          }))
+          .filter((entry) => Number.isFinite(entry.price));
+
+        if (entries.length === 0) {
+          return `No historical data found for symbol ${symbol} and date range ${from} to ${to}.`;
+        }
+
+        const isSingleDayRange =
+          fromDate.toISOString().slice(0, 10) === toDate.toISOString().slice(0, 10);
+        if (isSingleDayRange) {
+          const point = entries[entries.length - 1];
+          return `${symbol}: ${point.date} -> ${point.price}`;
+        }
+
+        let highest = entries[0];
+        let lowest = entries[0];
+        for (const entry of entries.slice(1)) {
+          if (entry.price > highest.price) {
+            highest = entry;
+          }
+          if (entry.price < lowest.price) {
+            lowest = entry;
+          }
+        }
+
+        return [
+          `Market report for ${symbol} (${from} to ${to})`,
+          `Highest: ${highest.price} on ${highest.date}`,
+          `Lowest: ${lowest.price} on ${lowest.date}`,
+          `Data points: ${entries.length}`
+        ].join('\n');
       } catch (err) {
         const message =
           err instanceof Error

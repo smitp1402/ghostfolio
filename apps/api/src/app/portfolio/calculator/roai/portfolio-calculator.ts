@@ -26,6 +26,34 @@ import { cloneDeep, sortBy } from 'lodash';
 export class RoaiPortfolioCalculator extends PortfolioCalculator {
   private chartDates: string[];
 
+  private getLatestMarketPriceOnOrBeforeDate({
+    marketSymbolMap,
+    symbol,
+    targetDate
+  }: {
+    marketSymbolMap: { [date: string]: { [symbol: string]: Big } };
+    symbol: string;
+    targetDate: string;
+  }): Big | undefined {
+    const dates = Object.keys(marketSymbolMap).sort();
+
+    for (let i = dates.length - 1; i >= 0; i -= 1) {
+      const date = dates[i];
+
+      if (date > targetDate) {
+        continue;
+      }
+
+      const marketPrice = marketSymbolMap[date]?.[symbol];
+
+      if (marketPrice) {
+        return marketPrice;
+      }
+    }
+
+    return undefined;
+  }
+
   protected calculateOverallPerformance(
     positions: TimelinePosition[]
   ): PortfolioSnapshot {
@@ -243,8 +271,24 @@ export class RoaiPortfolioCalculator extends PortfolioCalculator {
     const endDateString = format(end, DATE_FORMAT);
     const startDateString = format(start, DATE_FORMAT);
 
-    const unitPriceAtStartDate = marketSymbolMap[startDateString]?.[symbol];
+    let unitPriceAtStartDate = marketSymbolMap[startDateString]?.[symbol];
     let unitPriceAtEndDate = marketSymbolMap[endDateString]?.[symbol];
+
+    if (!unitPriceAtStartDate) {
+      unitPriceAtStartDate = this.getLatestMarketPriceOnOrBeforeDate({
+        marketSymbolMap,
+        symbol,
+        targetDate: startDateString
+      });
+    }
+
+    if (!unitPriceAtEndDate) {
+      unitPriceAtEndDate = this.getLatestMarketPriceOnOrBeforeDate({
+        marketSymbolMap,
+        symbol,
+        targetDate: endDateString
+      });
+    }
 
     let latestActivity = orders.at(-1);
 

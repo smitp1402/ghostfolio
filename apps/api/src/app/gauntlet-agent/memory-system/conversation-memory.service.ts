@@ -7,11 +7,18 @@ import type { BaseMessage } from '@langchain/core/messages';
 import ms from 'ms';
 import { randomUUID } from 'node:crypto';
 
-import type { ConversationHistory, StoredMessage } from './conversation-memory.interface';
+import type {
+  ConversationHistory,
+  ConversationIntentState,
+  IntentLabel,
+  StoredMessage
+} from './conversation-memory.interface';
 
 const CONVERSATION_KEY_PREFIX = 'gauntlet:conversation:';
+const INTENT_STATE_KEY_PREFIX = 'gauntlet:intent-state:';
 const DEFAULT_MAX_HISTORY_MESSAGES = 20;
 const DEFAULT_MAX_STORED_MESSAGES = 50;
+const DEFAULT_MAX_RECENT_ENTITIES = 20;
 const DEFAULT_TTL_MS = ms('7 days');
 
 @Injectable()
@@ -25,6 +32,73 @@ export class ConversationMemoryService {
 
   private getKey(userId: string, conversationId: string): string {
     return `${CONVERSATION_KEY_PREFIX}${userId}:${conversationId}`;
+  }
+
+  private getIntentStateKey(userId: string, conversationId: string): string {
+    return `${INTENT_STATE_KEY_PREFIX}${userId}:${conversationId}`;
+  }
+
+  private toTtlMs(ttlMs?: number): number {
+    const ttlRaw = ttlMs ?? this.configurationService.get('GAUNTLET_CONVERSATION_TTL_MS');
+    return ttlRaw != null
+      ? typeof ttlRaw === 'number'
+        ? ttlRaw
+        : Number(ttlRaw) || (ms as (s: string) => number)(String(ttlRaw))
+      : DEFAULT_TTL_MS;
+  }
+
+  private defaultIntentState(): ConversationIntentState {
+    return {
+      lastIntent: 'uncertain',
+      recentEntities: [],
+      pendingClarification: false,
+      updatedAt: new Date(0).toISOString()
+    };
+  }
+
+  private parseIntentState(raw: unknown): ConversationIntentState {
+    if (raw == null) return this.defaultIntentState();
+    const fromRaw =
+      typeof raw === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(raw) as unknown;
+            } catch {
+              return null;
+            }
+          })()
+        : raw;
+    if (!fromRaw || typeof fromRaw !== 'object') return this.defaultIntentState();
+    const candidate = fromRaw as Partial<ConversationIntentState>;
+    const lastIntent =
+      candidate.lastIntent === 'on_topic' ||
+      candidate.lastIntent === 'off_topic' ||
+      candidate.lastIntent === 'uncertain'
+        ? candidate.lastIntent
+        : 'uncertain';
+    const lastToolUsed =
+      typeof candidate.lastToolUsed === 'string' && candidate.lastToolUsed.trim()
+        ? candidate.lastToolUsed.trim()
+        : undefined;
+    const pendingClarification = Boolean(candidate.pendingClarification);
+    const updatedAt =
+      typeof candidate.updatedAt === 'string' && candidate.updatedAt
+        ? candidate.updatedAt
+        : new Date(0).toISOString();
+    const recentEntities = Array.isArray(candidate.recentEntities)
+      ? candidate.recentEntities
+          .filter((entity): entity is string => typeof entity === 'string')
+          .map((entity) => entity.trim())
+          .filter(Boolean)
+          .slice(-DEFAULT_MAX_RECENT_ENTITIES)
+      : [];
+    return {
+      lastIntent,
+      lastToolUsed,
+      recentEntities,
+      pendingClarification,
+      updatedAt
+    };
   }
 
   private parseStored(raw: string | ConversationHistory | null): StoredMessage[] {
@@ -107,17 +181,50 @@ export class ConversationMemoryService {
       this.configurationService.get('GAUNTLET_MAX_STORED_MESSAGES') ??
       DEFAULT_MAX_STORED_MESSAGES;
     const trimmed = stored.slice(-maxStored);
-    const ttlRaw = ttlMs ?? this.configurationService.get('GAUNTLET_CONVERSATION_TTL_MS');
-    const ttl =
-      ttlRaw != null
-        ? typeof ttlRaw === 'number'
-          ? ttlRaw
-          : Number(ttlRaw) || (ms as (s: string) => number)(String(ttlRaw))
-        : DEFAULT_TTL_MS;
+    const ttl = this.toTtlMs(ttlMs);
     await this.redisCacheService.set(key, JSON.stringify(trimmed), ttl);
     this.logger.log(
       `appendTurn key=${key} before=${beforeCount} after=${trimmed.length} ttlMs=${ttl} humanLen=${humanContent.length} assistantLen=${assistantContent.length}`
     );
+  }
+
+  public async getIntentState(
+    conversationId: string,
+    userId: string
+  ): Promise<ConversationIntentState> {
+    const key = this.getIntentStateKey(userId, conversationId);
+    const raw = await this.redisCacheService.get(key);
+    const parsed = this.parseIntentState(raw);
+    return parsed;
+  }
+
+  public async updateIntentState(
+    conversationId: string,
+    userId: string,
+    patch: Partial<ConversationIntentState> & { lastIntent?: IntentLabel },
+    ttlMs?: number
+  ): Promise<ConversationIntentState> {
+    const key = this.getIntentStateKey(userId, conversationId);
+    const current = await this.getIntentState(conversationId, userId);
+    const mergedEntities = [
+      ...(Array.isArray(current.recentEntities) ? current.recentEntities : []),
+      ...(Array.isArray(patch.recentEntities) ? patch.recentEntities : [])
+    ]
+      .map((entity) => String(entity).trim())
+      .filter(Boolean);
+    const uniqueEntities = Array.from(new Set(mergedEntities)).slice(
+      -DEFAULT_MAX_RECENT_ENTITIES
+    );
+    const next: ConversationIntentState = {
+      ...current,
+      ...patch,
+      recentEntities: uniqueEntities,
+      pendingClarification:
+        patch.pendingClarification ?? current.pendingClarification ?? false,
+      updatedAt: new Date().toISOString()
+    };
+    await this.redisCacheService.set(key, JSON.stringify(next), this.toTtlMs(ttlMs));
+    return next;
   }
 
   public createConversationId(): string {
