@@ -79,14 +79,26 @@ export function createMarketHistoricalTool(
           return `Error: Invalid dataSource. Must be one of: ${DATA_SOURCE_VALUES.join(', ')}.`;
         }
 
-        const result = await dataProviderService.getHistorical(
+        let result = await dataProviderService.getHistorical(
           [{ dataSource: dataSource as DataSource, symbol }],
           'day',
           fromDate,
           toDate
         );
 
-        const bySymbol = result[symbol];
+        let bySymbol = result[symbol];
+        if (!bySymbol || Object.keys(bySymbol).length === 0) {
+          // Fallback to provider fetch when local MarketData cache has no rows.
+          result = await dataProviderService.getHistoricalRaw({
+            assetProfileIdentifiers: [
+              { dataSource: dataSource as DataSource, symbol }
+            ],
+            from: fromDate,
+            to: toDate
+          });
+          bySymbol = result[symbol];
+        }
+
         if (!bySymbol || Object.keys(bySymbol).length === 0) {
           return `No historical data found for symbol ${symbol} and date range ${from} to ${to}.`;
         }

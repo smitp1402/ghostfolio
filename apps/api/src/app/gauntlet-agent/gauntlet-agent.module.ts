@@ -1,3 +1,4 @@
+import { AccountModule } from '@ghostfolio/api/app/account/account.module';
 import { OrderModule } from '@ghostfolio/api/app/order/order.module';
 import { PortfolioModule } from '@ghostfolio/api/app/portfolio/portfolio.module';
 import { UserModule } from '@ghostfolio/api/app/user/user.module';
@@ -14,6 +15,7 @@ import { ConversationMemoryModule } from '@ghostfolio/api/app/gauntlet-agent/mem
 @Module({
   controllers: [GauntletAgentController],
   imports: [
+    AccountModule,
     ConfigurationModule,
     ConversationMemoryModule,
     DataProviderModule,

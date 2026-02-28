@@ -1,3 +1,4 @@
+import { AccountService } from '@ghostfolio/api/app/account/account.service';
 import { OrderService } from '@ghostfolio/api/app/order/order.service';
 import { PortfolioService } from '@ghostfolio/api/app/portfolio/portfolio.service';
 import { DataProviderService } from '@ghostfolio/api/services/data-provider/data-provider.service';
@@ -5,6 +6,7 @@ import { DataProviderService } from '@ghostfolio/api/services/data-provider/data
 import type { DynamicTool } from '@langchain/core/tools';
 
 import { createActivitiesListTool } from './activities-list.tool';
+import { createCashTransferTool } from './cash-transfer.tool';
 import { createMarketHistoricalTool } from './market-historical.tool';
 import { createPortfolioDetailsTool } from './portfolio-details.tool';
 import { createPortfolioPerformanceTool } from './portfolio-performance.tool';
@@ -16,6 +18,7 @@ import { createPortfolioReportTool } from './portfolio-report.tool';
  * PortfolioService.getDetails/getPerformance/getReport, OrderService.getOrders, and DataProviderService.getHistorical for the authenticated user.
  */
 export function getGauntletTools(
+  accountService: AccountService,
   portfolioService: PortfolioService,
   orderService: OrderService,
   dataProviderService: DataProviderService,
@@ -27,6 +30,7 @@ export function getGauntletTools(
     createPortfolioPerformanceTool(portfolioService, userId),
     createPortfolioReportTool(portfolioService, userId),
     createActivitiesListTool(orderService, userId, userCurrency),
-    createMarketHistoricalTool(dataProviderService)
+    createMarketHistoricalTool(dataProviderService),
+    createCashTransferTool(accountService, userId)
   ];
 }

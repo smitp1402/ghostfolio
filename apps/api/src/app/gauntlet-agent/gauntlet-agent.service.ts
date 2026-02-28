@@ -1,3 +1,4 @@
+import { AccountService } from '@ghostfolio/api/app/account/account.service';
 import { OrderService } from '@ghostfolio/api/app/order/order.service';
 import { PortfolioService } from '@ghostfolio/api/app/portfolio/portfolio.service';
 import { ConfigurationService } from '@ghostfolio/api/services/configuration/configuration.service';
@@ -34,7 +35,7 @@ const SHORT_FOLLOW_UP_MAX_WORDS = 8;
 const SUMMARY_MAX_CHARS = 160;
 
 const DOMAIN_KEYWORD_REGEX =
-  /\b(portfolio|allocation|holding|holdings|position|positions|investments?|account summary|performance|returns?|pnl|profit|loss|drawdown|activities?|transactions?|orders?|bought|sold|buy|sell|report|rule violations?|risk check|compliance|historical|price|prices|market data)\b/i;
+  /\b(portfolio|allocation|holding|holdings|position|positions|investments?|account summary|performance|returns?|pnl|profit|loss|drawdown|activities?|transactions?|orders?|bought|sold|buy|sell|report|rule violations?|risk check|compliance|historical|price|prices|market data|cash transfer|transfer|move cash|deposit|withdraw)\b/i;
 const DATE_OR_RANGE_REGEX =
   /\b\d{4}-\d{2}-\d{2}\b|\b(last|since|from|to|between|month|quarter|year|ytd)\b/i;
 const TICKER_LIKE_REGEX = /\b[A-Z]{2,10}\b/;
@@ -89,6 +90,7 @@ In-scope topics:
 - portfolio report, rule violations, risk/compliance checks
 - transactions, orders, activities (what user bought/sold)
 - historical market prices for a symbol over date(s)
+- cash transfer between the user's own accounts
 
 If the user's message is a short follow-up (for example: "what about last month?", "and the year before?", "break that down", "explain that"), treat it as in-scope when recent conversation messages are in-scope.
 
@@ -99,7 +101,7 @@ Rules:
 - confidence must be between 0 and 1
 - no markdown, no prose outside JSON`;
 
-const INTENT_SECOND_CHANCE_SYSTEM_PROMPT = `You classify whether the user is asking about portfolio, activities, or market data in this app.
+const INTENT_SECOND_CHANCE_SYSTEM_PROMPT = `You classify whether the user is asking about portfolio, activities, market data, or account cash transfer in this app.
 
 Be conservative before classifying off_topic: when the message could plausibly refer to recent portfolio context, prefer "uncertain".
 
@@ -111,7 +113,7 @@ Rules:
 - no markdown, no prose outside JSON`;
 
 const OFF_TOPIC_MESSAGE =
-  'I can only help with portfolio, activities, and market data in this app.';
+  'I can only help with portfolio, activities, market data, and account cash transfers in this app.';
 
 const SYSTEM_PROMPT = `You are a finance-focused assistant that explains portfolio data. You only provide informational answers based on 
 the data you retrieve. You must NOT give buy/sell advice or investment recommendations. If the user asks about their portfolio, allocation, or 
@@ -123,13 +125,15 @@ the data you retrieve. You must NOT give buy/sell advice or investment recommend
   "my activities", or similar, use the activities_list tool and summarize the results. If the user asks for the historical price of a symbol on
    a date or over a date range (e.g. "What was the price of AAPL on 2024-01-15?", "Historical price for BTC from X to Y", "Give me a report of MSFT in 2012"), use the market_historical 
    tool with the symbol, dataSource (e.g. YAHOO for stocks, COINGECKO for crypto), and from/to dates in YYYY, YYYY-MM, or YYYY-MM-DD. If any required market_historical
-   argument is missing or ambiguous, ask a concise clarification question instead of guessing. For report-style market queries, summarize the highest and lowest prices with their dates.`;
+   argument is missing or ambiguous, ask a concise clarification question instead of guessing. For report-style market queries, summarize the highest and lowest prices with their dates.
+If the user asks to transfer/move cash between their own accounts, use the cash_transfer tool. Always run a preview first (confirm=false), summarize the proposed transfer, and execute only after explicit user confirmation (confirm=true).`;
 
 @Injectable()
 export class GauntletAgentService {
   private readonly logger = new Logger(GauntletAgentService.name);
 
   public constructor(
+    private readonly accountService: AccountService,
     private readonly configurationService: ConfigurationService,
     private readonly conversationMemoryService: ConversationMemoryService,
     private readonly dataProviderService: DataProviderService,
@@ -610,6 +614,7 @@ export class GauntletAgentService {
     });
 
     const tools = getGauntletTools(
+      this.accountService,
       this.portfolioService,
       this.orderService,
       this.dataProviderService,
@@ -848,6 +853,7 @@ export class GauntletAgentService {
     });
 
     const tools = getGauntletTools(
+      this.accountService,
       this.portfolioService,
       this.orderService,
       this.dataProviderService,
