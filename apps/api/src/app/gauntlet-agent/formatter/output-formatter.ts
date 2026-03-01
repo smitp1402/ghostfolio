@@ -1,4 +1,4 @@
-import { VerificationResult } from './types';
+import { VerificationResult } from '../verification-layer/types';
 
 export interface OutputCitation {
   source: string;

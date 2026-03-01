@@ -15,7 +15,7 @@ import { REQUEST } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 
-import { GauntletAgentService } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.service';
+import { GauntletAgentService } from './gauntlet-agent.service';
 import { ChatDto } from '@ghostfolio/api/app/gauntlet-agent/dto/chat.dto';
 
 @Controller('gauntlet-agent')

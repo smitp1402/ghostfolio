@@ -19,10 +19,10 @@ import {
   ToolMessage
 } from '@langchain/core/messages';
 
-import { ConversationMemoryService } from './memory-system/conversation-memory.service';
-import { getGauntletTools } from './tools/tool.registry';
-import { formatStructuredOutput } from './verification-layer/output-formatter';
-import { verifyResponse } from './verification-layer/verifier';
+import { ConversationMemoryService } from '../memory-system/conversation-memory.service';
+import { getGauntletTools } from '../tools/tool.registry';
+import { formatStructuredOutput } from '../formatter/output-formatter';
+import { verifyResponse } from '../verification-layer/verifier';
 
 /** Default OpenRouter model when OPENROUTER_MODEL is not set. Must support tool/function calling. Use a faster model for lower latency. */
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
@@ -81,6 +81,17 @@ const CRYPTO_SYMBOLS = new Set([
   'AVAX',
   'MATIC',
   'BNB'
+]);
+const DATA_SOURCE_TOKENS = new Set([
+  'ALPHA_VANTAGE',
+  'COINGECKO',
+  'EOD_HISTORICAL_DATA',
+  'FINANCIAL_MODELING_PREP',
+  'GHOSTFOLIO',
+  'GOOGLE_SHEETS',
+  'MANUAL',
+  'RAPID_API',
+  'YAHOO'
 ]);
 
 /** Prompt for structured intent check used by hybrid gating logic. */
@@ -403,10 +414,57 @@ export class GauntletAgentService {
     return yearMatch?.[0];
   }
 
+  private normalizeDataSourceToken(value: string): string | undefined {
+    const normalized = value.trim().replace(/[-\s]+/g, '_').toUpperCase();
+    return DATA_SOURCE_TOKENS.has(normalized) ? normalized : undefined;
+  }
+
+  private extractDataSourceCandidate(text: string): string | undefined {
+    const explicitPatterns = [
+      /\bdataSource\s*[:=]\s*([A-Za-z_ -]+)\b/i,
+      /\bdata\s*source\s*[:=]?\s*([A-Za-z_ -]+)\b/i,
+      /\b(?:use|using|provider|source)\s*[:=]?\s*([A-Za-z_ -]+)\b/i
+    ];
+    for (const pattern of explicitPatterns) {
+      const match = text.match(pattern);
+      const candidate = match?.[1];
+      if (!candidate) {
+        continue;
+      }
+      const token = this.normalizeDataSourceToken(candidate);
+      if (token) {
+        return token;
+      }
+    }
+
+    const upperTokens = text.match(/\b[A-Z_]{3,24}\b/g) ?? [];
+    for (const token of upperTokens) {
+      const normalized = this.normalizeDataSourceToken(token);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return undefined;
+  }
+
   private extractTickerCandidate(text: string): string | undefined {
+    const explicitTickerMatch = text.match(
+      /\b(?:price|historical(?:\s+price)?|quote|value)\s+(?:of|for)\s+([A-Za-z][A-Za-z0-9.-]{0,9})\b/i
+    );
+    if (explicitTickerMatch) {
+      const explicitTicker = explicitTickerMatch[1].toUpperCase();
+      if (!DATA_SOURCE_TOKENS.has(explicitTicker)) {
+        return explicitTicker;
+      }
+    }
+
     const upperTicker = text.match(/\b[A-Z]{2,10}\b/g);
     if (upperTicker && upperTicker.length > 0) {
-      return upperTicker[upperTicker.length - 1];
+      const ticker = upperTicker.find((token) => !DATA_SOURCE_TOKENS.has(token));
+      if (ticker) {
+        return ticker;
+      }
     }
     const looseTicker = text.match(/\b[a-z]{2,10}\b/g);
     if (!looseTicker) {
@@ -422,11 +480,15 @@ export class GauntletAgentService {
       'from',
       'to',
       'for',
-      'data'
+      'data',
+      'use',
+      'using',
+      'source',
+      'provider'
     ]);
     const candidate = looseTicker
       .map((token) => token.toLowerCase())
-      .find((token) => !denyList.has(token));
+      .find((token) => !denyList.has(token) && !DATA_SOURCE_TOKENS.has(token.toUpperCase()));
     return candidate?.toUpperCase();
   }
 
@@ -457,8 +519,19 @@ export class GauntletAgentService {
       rawArgs && typeof rawArgs === 'object' ? { ...(rawArgs as Record<string, unknown>) } : {};
     const contextMessages = this.getRecentUserMessages(history, currentMessage);
     const contextText = contextMessages.join('\n');
+    const explicitDataSource =
+      this.extractDataSourceCandidate(currentMessage) ??
+      this.extractDataSourceCandidate(contextText);
+    const rawSymbol = typeof args.symbol === 'string' ? args.symbol.trim().toUpperCase() : '';
+    const symbolLooksLikeDataSource = rawSymbol
+      ? Boolean(this.normalizeDataSourceToken(rawSymbol))
+      : false;
 
-    if (typeof args.symbol !== 'string' || !args.symbol.trim()) {
+    if (
+      typeof args.symbol !== 'string' ||
+      !args.symbol.trim() ||
+      symbolLooksLikeDataSource
+    ) {
       const symbol = this.extractTickerCandidate(currentMessage) ?? this.extractTickerCandidate(contextText);
       if (symbol) {
         args.symbol = symbol;
@@ -502,6 +575,10 @@ export class GauntletAgentService {
     }
 
     if (typeof args.dataSource !== 'string' || !args.dataSource.trim()) {
+      if (explicitDataSource) {
+        args.dataSource = explicitDataSource;
+        return args;
+      }
       const symbol = typeof args.symbol === 'string' ? args.symbol.trim().toUpperCase() : '';
       if (symbol) {
         args.dataSource = CRYPTO_SYMBOLS.has(symbol) ? 'COINGECKO' : 'YAHOO';

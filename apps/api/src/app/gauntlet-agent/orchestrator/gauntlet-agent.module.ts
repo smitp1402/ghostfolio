@@ -8,8 +8,8 @@ import { PropertyModule } from '@ghostfolio/api/services/property/property.modul
 
 import { Module } from '@nestjs/common';
 
-import { GauntletAgentController } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.controller';
-import { GauntletAgentService } from '@ghostfolio/api/app/gauntlet-agent/gauntlet-agent.service';
+import { GauntletAgentController } from './gauntlet-agent.controller';
+import { GauntletAgentService } from './gauntlet-agent.service';
 import { ConversationMemoryModule } from '@ghostfolio/api/app/gauntlet-agent/memory-system/conversation-memory.module';
 
 @Module({
