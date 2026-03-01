@@ -69,7 +69,6 @@
   font-weight: 600;
   font-size: 1.0625rem;
   color: rgba(var(--dark-primary-text), 0.96);
-  text-shadow: 0 1px 2px rgba(var(--light-primary-text), 0.2);
 }
 
 .gauntlet-history-toggle {
@@ -83,31 +82,14 @@
 }
 
 .gauntlet-header-title-icon-wrap {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.85rem;
   height: 1.85rem;
   border-radius: 999px;
-  background: radial-gradient(
-    circle at 30% 30%,
-    rgba(var(--dark-primary-text), 0.22),
-    rgba(var(--dark-primary-text), 0.08) 58%,
-    transparent 100%
-  );
-  box-shadow:
-    0 0 0 1px rgba(var(--dark-primary-text), 0.28) inset,
-    0 0 10px rgba(var(--dark-primary-text), 0.15);
-}
-
-.gauntlet-header-title-icon-wrap::after {
-  content: '';
-  position: absolute;
-  inset: -0.18rem;
-  border-radius: inherit;
-  border: 1px solid rgba(var(--dark-primary-text), 0.35);
-  opacity: 0;
-  animation: gauntlet-title-icon-ping 2.6s ease-out infinite;
+  background-color: rgba(var(--dark-primary-text), 0.1);
+  border: 1px solid rgba(var(--dark-primary-text), 0.28);
 }
 
 .gauntlet-header-title-icon {
@@ -123,9 +105,6 @@
 }
 
 .gauntlet-suggestions-toggle {
-  position: relative;
-  isolation: isolate;
-  overflow: visible;
   min-height: 2rem;
   padding: 0 0.75rem;
   border: 1px solid rgba(var(--light-primary-text), 0.4);
@@ -133,54 +112,16 @@
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  line-height: 1;
   border-radius: 999px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(var(--palette-primary-500), 0.45) 0%,
-      rgba(var(--palette-primary-500), 0.25) 45%,
-      rgba(var(--light-primary-text), 0.06) 100%
-    );
-  box-shadow:
-    0 0 0 1px rgba(var(--light-primary-text), 0.08) inset,
-    0 4px 14px rgba(0, 0, 0, 0.22);
-  transition:
-    transform 160ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease,
+  background-color: rgba(var(--palette-primary-500), 0.35);
+  box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.08) inset;
+  transition: transform 160ms ease, border-color 180ms ease,
     background-color 180ms ease;
 }
 
-.gauntlet-suggestions-toggle::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    120deg,
-    transparent 10%,
-    rgba(var(--light-primary-text), 0.06) 42%,
-    rgba(var(--light-primary-text), 0.2) 50%,
-    rgba(var(--light-primary-text), 0.06) 58%,
-    transparent 90%
-  );
-  transform: translateX(-150%);
-  animation: gauntlet-ai-shimmer 4.5s ease-in-out infinite;
-}
-
 .gauntlet-suggestions-toggle-attention::after {
-  content: '';
-  position: absolute;
-  inset: -0.22rem;
-  border-radius: 999px;
-  border: 1.5px solid rgba(var(--light-primary-text), 0.9);
-  box-shadow:
-    0 0 0 2px rgba(var(--palette-primary-500), 0.22),
-    0 0 18px rgba(var(--palette-primary-500), 0.58);
-  animation: gauntlet-toggle-border-pulse 1.7s ease-in-out infinite;
-  pointer-events: none;
+  border-color: rgba(var(--light-primary-text), 0.75);
+  box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.15) inset;
 }
 
 .gauntlet-suggestions-toggle-icon {
@@ -193,18 +134,14 @@
 .gauntlet-suggestions-toggle:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: rgba(var(--light-primary-text), 0.7);
-  box-shadow:
-    0 0 0 1px rgba(var(--light-primary-text), 0.12) inset,
-    0 0 18px rgba(var(--palette-primary-500), 0.36),
-    0 8px 18px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.12) inset;
 }
 
 .gauntlet-suggestions-toggle:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px rgba(var(--light-primary-text), 0.75),
-    0 0 0 4px rgba(var(--palette-primary-500), 0.45),
-    0 0 16px rgba(var(--palette-primary-500), 0.4);
+    0 0 0 4px rgba(var(--palette-primary-500), 0.45);
 }
 
 .gauntlet-suggestions-toggle:disabled {
@@ -212,52 +149,8 @@
   box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.08) inset;
 }
 
-.gauntlet-suggestions-toggle:disabled::before {
-  animation: none;
-  opacity: 0.35;
-}
-
 .gauntlet-suggestions-toggle:disabled::after {
-  animation: none;
-  opacity: 0;
-}
-
-@keyframes gauntlet-ai-shimmer {
-  0%,
-  75%,
-  100% {
-    transform: translateX(-150%);
-  }
-  35% {
-    transform: translateX(150%);
-  }
-}
-
-@keyframes gauntlet-toggle-border-pulse {
-  0%,
-  100% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.045);
-  }
-}
-
-@keyframes gauntlet-title-icon-ping {
-  0% {
-    opacity: 0.65;
-    transform: scale(0.9);
-  }
-  75% {
-    opacity: 0;
-    transform: scale(1.3);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.3);
-  }
+  box-shadow: none;
 }
 
 .gauntlet-close {
@@ -373,7 +266,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease;
 }
 
 .gauntlet-history-item:hover:not(:disabled) {
@@ -484,9 +377,7 @@
 :host-context(.theme-dark) .gauntlet-suggestions-toggle {
   border-color: rgba(var(--light-primary-text), 0.42);
   color: rgba(var(--light-primary-text), 0.98);
-  box-shadow:
-    0 0 0 1px rgba(var(--light-primary-text), 0.1) inset,
-    0 0 16px rgba(var(--palette-primary-500), 0.22);
+  box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.1) inset;
 }
 
 :host-context(.theme-dark) .gauntlet-history-toggle {
@@ -495,9 +386,7 @@
 
 :host-context(.theme-dark) .gauntlet-suggestions-toggle-attention::after {
   border-color: rgba(var(--light-primary-text), 0.88);
-  box-shadow:
-    0 0 0 2px rgba(var(--palette-primary-500), 0.24),
-    0 0 20px rgba(var(--palette-primary-500), 0.62);
+  box-shadow: 0 0 0 1px rgba(var(--light-primary-text), 0.2) inset;
 }
 
 .gauntlet-message {
@@ -625,8 +514,6 @@
 
 .gauntlet-sources {
   margin-top: 0.6rem;
-  border-top: 1px solid rgba(var(--dark-dividers), 0.7);
-  padding-top: 0.45rem;
 }
 
 .gauntlet-sources-toggle {
@@ -637,17 +524,14 @@
   padding: 0;
   background: transparent;
   color: rgba(var(--palette-primary-500), 0.95);
-  font-size: 0.82rem;
-  text-decoration: underline;
   cursor: pointer;
 }
 
 .gauntlet-sources-toggle-label {
-  font-weight: 600;
+  font-size: 0.82rem;
 }
 
 .gauntlet-sources-toggle-caret {
-  font-size: 0.8rem;
   line-height: 1;
 }
 
@@ -658,26 +542,11 @@
 }
 
 .gauntlet-source-item {
-  border: 1px solid rgba(var(--dark-dividers), 0.75);
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  background-color: rgba(var(--light-background), 0.55);
+  padding: 0.25rem 0;
 }
 
 .gauntlet-source-name {
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-::host-context(.theme-dark) .gauntlet-sources {
-  border-top-color: rgba(var(--light-dividers), 0.65);
-}
-
-::host-context(.theme-dark) .gauntlet-source-item {
-  border-color: rgba(var(--light-dividers), 0.75);
-  background-color: rgba(var(--dark-background), 0.45);
+  font-size: 0.78rem;
 }
 
 ::host-context(.theme-dark) .gauntlet-sources-toggle {
