@@ -23,7 +23,7 @@
 }
 
 .gauntlet-panel {
-  width: 28rem;
+  width: 34rem;
   max-width: calc(100vw - 3rem);
   height: 38rem;
   max-height: 85vh;
@@ -70,6 +70,16 @@
   font-size: 1.0625rem;
   color: rgba(var(--dark-primary-text), 0.96);
   text-shadow: 0 1px 2px rgba(var(--light-primary-text), 0.2);
+}
+
+.gauntlet-history-toggle {
+  width: 1.95rem;
+  height: 1.95rem;
+  color: rgba(var(--dark-primary-text), 0.95);
+}
+
+.gauntlet-history-toggle ion-icon {
+  font-size: 1.15rem;
 }
 
 .gauntlet-header-title-icon-wrap {
@@ -254,8 +264,43 @@
   color: rgba(var(--light-primary-text));
 }
 
+.gauntlet-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.gauntlet-sidebar {
+  width: 16.5rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 0.75rem;
+  border-right: 1px solid rgba(var(--dark-dividers), 0.8);
+  background-color: rgba(var(--light-background), 0.32);
+}
+
+.gauntlet-sidebar-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.86;
+  padding: 0 0.25rem;
+}
+
+.gauntlet-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .gauntlet-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 1rem;
@@ -269,6 +314,11 @@
   background-color: var(--dark-background);
 }
 
+:host-context(.theme-dark) .gauntlet-sidebar {
+  border-right-color: rgba(var(--light-dividers), 0.8);
+  background-color: rgba(var(--dark-background), 0.42);
+}
+
 .gauntlet-placeholder {
   margin: 0;
   max-width: 100%;
@@ -280,12 +330,89 @@
   word-break: break-word;
 }
 
+.gauntlet-discovery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(var(--dark-dividers), 0.7);
+  border-radius: 0.8rem;
+  background-color: rgba(var(--light-background), 0.45);
+}
+
+.gauntlet-history {
+  margin-top: 0.1rem;
+}
+
+.gauntlet-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 100%;
+  overflow-y: auto;
+  padding-right: 0.1rem;
+}
+
+.gauntlet-history-empty {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  opacity: 0.72;
+  padding: 0.45rem 0.25rem;
+}
+
+.gauntlet-history-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(var(--dark-dividers), 0.85);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.42rem 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.gauntlet-history-item:hover:not(:disabled) {
+  border-color: rgba(var(--palette-primary-500), 0.7);
+  background-color: rgba(var(--palette-primary-500), 0.08);
+}
+
+.gauntlet-history-item-active {
+  border-color: rgba(var(--palette-primary-500), 0.9);
+  background-color: rgba(var(--palette-primary-500), 0.14);
+}
+
+.gauntlet-history-item-title {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gauntlet-history-item-time {
+  font-size: 0.72rem;
+  opacity: 0.74;
+  flex-shrink: 0;
+}
+
 .gauntlet-suggestions {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
   max-width: 100%;
+}
+
+.gauntlet-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.2rem;
+  opacity: 0.82;
 }
 
 .gauntlet-suggestion {
@@ -330,6 +457,15 @@
   color: rgba(var(--light-secondary-text));
 }
 
+:host-context(.theme-dark) .gauntlet-discovery {
+  border-color: rgba(var(--light-dividers), 0.7);
+  background-color: rgba(var(--dark-background), 0.35);
+}
+
+:host-context(.theme-dark) .gauntlet-history-item {
+  border-color: rgba(var(--light-dividers), 0.8);
+}
+
 :host-context(.theme-dark) .gauntlet-suggestion {
   border-color: rgba(var(--light-dividers));
   background-color: rgba(var(--dark-background), 0.85);
@@ -351,6 +487,10 @@
   box-shadow:
     0 0 0 1px rgba(var(--light-primary-text), 0.1) inset,
     0 0 16px rgba(var(--palette-primary-500), 0.22);
+}
+
+:host-context(.theme-dark) .gauntlet-history-toggle {
+  color: rgba(var(--dark-primary-text), 0.95);
 }
 
 :host-context(.theme-dark) .gauntlet-suggestions-toggle-attention::after {
@@ -483,6 +623,67 @@
   }
 }
 
+.gauntlet-sources {
+  margin-top: 0.6rem;
+  border-top: 1px solid rgba(var(--dark-dividers), 0.7);
+  padding-top: 0.45rem;
+}
+
+.gauntlet-sources-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: rgba(var(--palette-primary-500), 0.95);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gauntlet-sources-toggle-label {
+  font-weight: 600;
+}
+
+.gauntlet-sources-toggle-caret {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.gauntlet-sources-list {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.gauntlet-source-item {
+  border: 1px solid rgba(var(--dark-dividers), 0.75);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background-color: rgba(var(--light-background), 0.55);
+}
+
+.gauntlet-source-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+::host-context(.theme-dark) .gauntlet-sources {
+  border-top-color: rgba(var(--light-dividers), 0.65);
+}
+
+::host-context(.theme-dark) .gauntlet-source-item {
+  border-color: rgba(var(--light-dividers), 0.75);
+  background-color: rgba(var(--dark-background), 0.45);
+}
+
+::host-context(.theme-dark) .gauntlet-sources-toggle {
+  color: rgba(var(--palette-primary-500), 0.9);
+}
+
 .gauntlet-input-row {
   flex-shrink: 0;
   display: flex;
@@ -540,4 +741,27 @@
 
 .gauntlet-header-trigger ion-icon {
   font-size: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .gauntlet-panel {
+    width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 1.5rem);
+    height: min(86vh, 42rem);
+  }
+
+  .gauntlet-body {
+    flex-direction: column;
+  }
+
+  .gauntlet-sidebar {
+    width: 100%;
+    max-height: 10.5rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(var(--dark-dividers), 0.8);
+  }
+
+  :host-context(.theme-dark) .gauntlet-sidebar {
+    border-bottom-color: rgba(var(--light-dividers), 0.8);
+  }
 }

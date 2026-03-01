@@ -92,6 +92,19 @@ export class GauntletAgentController {
               }
             }
           );
+        } else if (
+          typeof value === 'object' &&
+          value !== null &&
+          'structured' in value
+        ) {
+          res.write(
+            'data: ' + JSON.stringify({ structured: value.structured }) + '\n\n',
+            (err) => {
+              if (err) {
+                console.error('[GauntletAgent] stream write error', err);
+              }
+            }
+          );
         } else {
           res.write(
             'data: ' + JSON.stringify({ chunk: value }) + '\n\n',

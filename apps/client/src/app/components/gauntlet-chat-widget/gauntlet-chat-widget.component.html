@@ -4,6 +4,15 @@
       <div class="gauntlet-panel" (click)="$event.stopPropagation()">
         <div class="gauntlet-header">
           <div class="gauntlet-header-title">
+            <button
+              class="gauntlet-history-toggle"
+              mat-icon-button
+              type="button"
+              (click)="toggleHistorySidebar($event)"
+              [attr.aria-label]="isHistorySidebarOpen ? 'Hide history' : 'Show history'"
+            >
+              <ion-icon [name]="isHistorySidebarOpen ? 'chevron-back-outline' : 'menu-outline'" />
+            </button>
             <span class="gauntlet-header-title-icon-wrap" aria-hidden="true">
               <ion-icon class="gauntlet-header-title-icon" name="sparkles-outline" />
             </span>
@@ -41,73 +50,130 @@
             </button>
           </div>
         </div>
-        <div class="gauntlet-messages">
-          @if (messages.length === 0) {
-            <p class="gauntlet-placeholder" i18n>
-              This finance assistant helps you understand your investments with clear, context-aware guidance on portfolio health, performance trends, recent activity, and potential risk or rule concerns.
-            </p>
+        <div class="gauntlet-body">
+          @if (isHistorySidebarOpen) {
+            <aside class="gauntlet-sidebar">
+              <div class="gauntlet-sidebar-title">History</div>
+              @if (conversationHistory.length === 0) {
+                <div class="gauntlet-history-empty">No conversations yet.</div>
+              } @else {
+                <div class="gauntlet-history-list">
+                  @for (item of conversationHistory; track item.id) {
+                    <button
+                      class="gauntlet-history-item"
+                      [class.gauntlet-history-item-active]="item.id === currentHistoryId"
+                      type="button"
+                      (click)="openConversationHistoryItem(item)"
+                      [disabled]="isLoading"
+                    >
+                      <span class="gauntlet-history-item-title">{{ item.title }}</span>
+                      <span class="gauntlet-history-item-time">{{
+                        formatHistoryTimestamp(item.updatedAt)
+                      }}</span>
+                    </button>
+                  }
+                </div>
+              }
+            </aside>
           }
-          @if (showSuggestedPrompts) {
-            <div class="gauntlet-suggestions">
-              @for (suggestion of suggestedPrompts; track suggestion.query) {
-                <button
-                  class="gauntlet-suggestion"
-                  type="button"
-                  (click)="useSuggestedPrompt(suggestion.query)"
-                  [disabled]="isLoading"
+
+          <section class="gauntlet-main">
+            <div class="gauntlet-messages">
+              @if (messages.length === 0) {
+                <p class="gauntlet-placeholder" i18n>
+                  This finance assistant helps you understand your investments with clear, context-aware guidance on portfolio health, performance trends, recent activity, and potential risk or rule concerns.
+                </p>
+              }
+              @if (showSuggestedPrompts) {
+                <div class="gauntlet-suggestions">
+                  <div class="gauntlet-section-title">Suggested queries</div>
+                  @for (suggestion of suggestedPrompts; track suggestion.query) {
+                    <button
+                      class="gauntlet-suggestion"
+                      type="button"
+                      (click)="useSuggestedPrompt(suggestion.query)"
+                      [disabled]="isLoading"
+                    >
+                      {{ suggestion.query }}
+                    </button>
+                  }
+                </div>
+              }
+              @for (msg of messages; track msg.id) {
+                <div
+                  class="gauntlet-message"
+                  [class.gauntlet-message-user]="msg.role === 'user'"
+                  [class.gauntlet-message-assistant]="msg.role === 'assistant'"
                 >
-                  {{ suggestion.query }}
-                </button>
-              }
-            </div>
-          }
-          @for (msg of messages; track msg.id) {
-            <div
-              class="gauntlet-message"
-              [class.gauntlet-message-user]="msg.role === 'user'"
-              [class.gauntlet-message-assistant]="msg.role === 'assistant'"
-            >
-              @if (msg.role === 'assistant') {
-                <div class="gauntlet-avatar" aria-hidden="true"></div>
-              }
-              <div class="gauntlet-bubble">
-                @if (msg.role === 'assistant') {
-                  <div class="gauntlet-text gauntlet-markdown">
-                    @if (msg.text === '' && isLoading && $last) {
-                      <span class="gauntlet-typing-dots" aria-hidden="true">
-                        <span></span><span></span><span></span>
-                      </span>
+                  @if (msg.role === 'assistant') {
+                    <div class="gauntlet-avatar" aria-hidden="true"></div>
+                  }
+                  <div class="gauntlet-bubble">
+                    @if (msg.role === 'assistant') {
+                      <div class="gauntlet-text gauntlet-markdown">
+                        @if (msg.text === '' && isLoading && $last) {
+                          <span class="gauntlet-typing-dots" aria-hidden="true">
+                            <span></span><span></span><span></span>
+                          </span>
+                        } @else {
+                          <markdown [data]="msg.text" />
+                        }
+                      </div>
+                      @if (msg.structured?.citations?.length) {
+                        <div class="gauntlet-sources">
+                          <button
+                            class="gauntlet-sources-toggle"
+                            type="button"
+                            (click)="toggleSources(msg, $event)"
+                            [attr.aria-expanded]="msg.showSources === true"
+                          >
+                            <span class="gauntlet-sources-toggle-label"
+                              >Sources ({{ msg.structured?.citations?.length ?? 0 }})</span
+                            >
+                            <span class="gauntlet-sources-toggle-caret">{{
+                              msg.showSources ? '▴' : '▾'
+                            }}</span>
+                          </button>
+                          @if (msg.showSources) {
+                            <div class="gauntlet-sources-list">
+                              @for (citation of msg.structured?.citations ?? []; track citation.source + '-' + $index) {
+                                <div class="gauntlet-source-item">
+                                  <div class="gauntlet-source-name">{{ citation.source }}</div>
+                                </div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
                     } @else {
-                      <markdown [data]="msg.text" />
+                      <span class="gauntlet-text">{{ msg.text }}</span>
                     }
                   </div>
-                } @else {
-                  <span class="gauntlet-text">{{ msg.text }}</span>
-                }
-              </div>
+                </div>
+              }
             </div>
-          }
-        </div>
-        <div class="gauntlet-input-row">
-          <input
-            class="gauntlet-input"
-            type="text"
-            [placeholder]="'Type a message...'"
-            [(ngModel)]="inputMessage"
-            (keydown.enter)="$event.preventDefault(); send()"
-            [disabled]="isLoading"
-            i18n-placeholder
-          />
-          <button
-            class="gauntlet-send"
-            mat-flat-button
-            type="button"
-            (click)="send()"
-            [disabled]="isLoading || !inputMessage?.trim()"
-            [attr.aria-label]="'Send'"
-          >
-            <ion-icon name="send-outline" />
-          </button>
+            <div class="gauntlet-input-row">
+              <input
+                class="gauntlet-input"
+                type="text"
+                [placeholder]="'Type a message...'"
+                [(ngModel)]="inputMessage"
+                (keydown.enter)="$event.preventDefault(); send()"
+                [disabled]="isLoading"
+                i18n-placeholder
+              />
+              <button
+                class="gauntlet-send"
+                mat-flat-button
+                type="button"
+                (click)="send()"
+                [disabled]="isLoading || !inputMessage?.trim()"
+                [attr.aria-label]="'Send'"
+              >
+                <ion-icon name="send-outline" />
+              </button>
+            </div>
+          </section>
         </div>
       </div>
     }

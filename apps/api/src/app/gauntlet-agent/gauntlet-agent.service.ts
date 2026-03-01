@@ -21,6 +21,8 @@ import {
 
 import { ConversationMemoryService } from './memory-system/conversation-memory.service';
 import { getGauntletTools } from './tools/tool.registry';
+import { formatStructuredOutput } from './verification-layer/output-formatter';
+import { verifyResponse } from './verification-layer/verifier';
 
 /** Default OpenRouter model when OPENROUTER_MODEL is not set. Must support tool/function calling. Use a faster model for lower latency. */
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
@@ -704,7 +706,20 @@ export class GauntletAgentService {
     message: string;
     userId: string;
     userCurrency: string;
-  }): AsyncGenerator<string | { conversationId: string }> {
+  }): AsyncGenerator<
+    | string
+    | { conversationId: string }
+    | {
+        structured: {
+          answer: string;
+          confidence: number;
+          citations: Array<{ source: string; evidence: string }>;
+          warnings: string[];
+          verdict: 'PASS' | 'WARN' | 'REWRITE' | 'BLOCK';
+          reasons: string[];
+        };
+      }
+  > {
     const conversationId =
       initialConversationId?.trim() ||
       this.conversationMemoryService.createConversationId();
@@ -916,18 +931,31 @@ export class GauntletAgentService {
                   .join('')
               : String(accumulated.content ?? '');
         const final = text.trim() || 'I could not generate a response.';
+        const verification = await verifyResponse({
+          context: {
+            userMessage: message,
+            draftResponse: final,
+            invokedTools: invokedToolNames,
+            toolOutputs: toolOutputSnippets
+          }
+        });
+        const structured = formatStructuredOutput({
+          verification,
+          invokedTools: invokedToolNames,
+          toolOutputs: toolOutputSnippets
+        });
         await this.conversationMemoryService.appendTurn(
           conversationId,
           userId,
           message,
-          final
+          structured.answer
         );
         const lastToolUsed =
           invokedToolNames.length > 0
             ? invokedToolNames[invokedToolNames.length - 1]
             : intentState.lastToolUsed;
         const extractedEntities = this.extractEntitiesFromText(
-          [message, final, ...toolOutputSnippets].join('\n')
+          [message, structured.answer, ...toolOutputSnippets].join('\n')
         );
         await this.conversationMemoryService.updateIntentState(conversationId, userId, {
           lastIntent: 'on_topic',
@@ -935,6 +963,7 @@ export class GauntletAgentService {
           recentEntities: extractedEntities,
           pendingClarification: false
         });
+        yield { structured };
         return;
       }
 
@@ -1005,18 +1034,31 @@ export class GauntletAgentService {
               .join('')
           : String(accumulated.content ?? '');
     const final = text.trim() || 'I could not generate a response.';
+    const verification = await verifyResponse({
+      context: {
+        userMessage: message,
+        draftResponse: final,
+        invokedTools: invokedToolNames,
+        toolOutputs: toolOutputSnippets
+      }
+    });
+    const structured = formatStructuredOutput({
+      verification,
+      invokedTools: invokedToolNames,
+      toolOutputs: toolOutputSnippets
+    });
     await this.conversationMemoryService.appendTurn(
       conversationId,
       userId,
       message,
-      final
+      structured.answer
     );
     const lastToolUsed =
       invokedToolNames.length > 0
         ? invokedToolNames[invokedToolNames.length - 1]
         : intentState.lastToolUsed;
     const extractedEntities = this.extractEntitiesFromText(
-      [message, final, ...toolOutputSnippets].join('\n')
+      [message, structured.answer, ...toolOutputSnippets].join('\n')
     );
     await this.conversationMemoryService.updateIntentState(conversationId, userId, {
       lastIntent: 'on_topic',
@@ -1024,6 +1066,6 @@ export class GauntletAgentService {
       recentEntities: extractedEntities,
       pendingClarification: false
     });
-    if (final) yield final;
+    yield { structured };
   }
 }
