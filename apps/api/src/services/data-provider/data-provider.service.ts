@@ -321,11 +321,11 @@ export class DataProviderService implements OnModuleInit {
             throw new Error(
               `${activityPath}.symbol ("${symbol}") could not be validated for data source ("${dataSource}") due to a temporary network error. Please try again.`
             );
+          } else {
+            throw new Error(
+              `${activityPath}.symbol ("${symbol}") is not valid for the specified data source ("${dataSource}")`
+            );
           }
-
-          throw new Error(
-            `${activityPath}.symbol ("${symbol}") is not valid for the specified data source ("${dataSource}")`
-          );
         }
 
         assetProfiles[assetProfileIdentifier] = assetProfile;
