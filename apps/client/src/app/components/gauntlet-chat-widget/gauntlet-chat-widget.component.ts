@@ -113,9 +113,6 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
     },
     {
       query: 'Run my portfolio risk report.'
-    },
-    {
-      query: 'Show AAPL historical price for 2025.'
     }
   ];
 
