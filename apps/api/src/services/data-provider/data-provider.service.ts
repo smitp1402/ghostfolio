@@ -653,7 +653,8 @@ export class DataProviderService implements OnModuleInit {
         );
 
         promises.push(
-          promise.then(async (result) => {
+          promise
+            .then(async (result) => {
             for (const [symbol, dataProviderResponse] of Object.entries(
               result
             )) {
@@ -739,7 +740,19 @@ export class DataProviderService implements OnModuleInit {
                   })
               });
             } catch {}
-          })
+            })
+            .catch((error) => {
+              if (isNetworkError(error)) {
+                Logger.warn(
+                  `Could not fetch quotes from ${dataSource} for ${symbolsChunk.length} symbol${
+                    symbolsChunk.length > 1 ? 's' : ''
+                  } due to a temporary network issue. Returning partial results.`,
+                  'DataProviderService'
+                );
+              } else {
+                Logger.error(error, 'DataProviderService');
+              }
+            })
         );
       }
     }

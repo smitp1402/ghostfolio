@@ -65,7 +65,7 @@ import {
 } from '@ghostfolio/common/types';
 import { PerformanceCalculationType } from '@ghostfolio/common/types/performance-calculation-type.type';
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import {
   Account,
@@ -585,6 +585,7 @@ export class PortfolioService {
       netPerformancePercentageWithCurrencyEffectMap,
       netPerformanceWithCurrencyEffectMap,
       quantity,
+      dataSource,
       symbol,
       tags,
       valueInBaseCurrency
@@ -602,6 +603,15 @@ export class PortfolioService {
       }
 
       const assetProfile = symbolProfileMap[symbol];
+
+      if (!assetProfile) {
+        Logger.warn(
+          `No symbol profile found for holding ${dataSource}:${symbol}. Skipping this position to avoid failing the entire holdings response.`,
+          'PortfolioService'
+        );
+
+        continue;
+      }
 
       let markets: PortfolioPosition['markets'];
       let marketsAdvanced: PortfolioPosition['marketsAdvanced'];
