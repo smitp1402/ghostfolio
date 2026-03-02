@@ -17,7 +17,7 @@ export const toolGroundingRule: VerificationRule = {
         verdict: 'REWRITE',
         reason: 'numeric_claims_without_tool_evidence',
         rewrittenResponse:
-          'I do not have verified tool data for numeric values in this response yet. Please ask me to run the relevant portfolio or market tool first.'
+          'I want to make sure the numbers I share are accurate. Please ask again, and I will provide a clear and reliable response.'
       };
     }
 

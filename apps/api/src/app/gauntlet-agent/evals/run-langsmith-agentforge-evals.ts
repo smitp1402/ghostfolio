@@ -32,6 +32,7 @@ const DEFAULT_DATASET_NAME = 'AgentForgeEvals';
 const DEFAULT_EXPERIMENT_PREFIX = 'gauntlet-agent-ts';
 const DEFAULT_API_URL = 'http://localhost:3333/api/v1/gauntlet-agent/chat/stream';
 const DEFAULT_TIMEOUT_MS = 45000;
+const DEFAULT_CONSISTENCY_REPEATS = 2;
 
 class UnauthorizedError extends Error {
   public constructor(message: string) {
@@ -121,6 +122,32 @@ function getCategory(
 
 function includesIgnoreCase(text: string, token: string): boolean {
   return text.toLowerCase().includes(token.toLowerCase());
+}
+
+function looksLikeSpecificUnverifiedClaim(answer: string): boolean {
+  const hasNumericClaim = /\b\d+(?:[.,]\d+)?%?\b/.test(answer);
+  const hasMarketOrPerformanceLanguage =
+    /\b(return|returns|gain|gains|profit|price|value|net worth|performance|allocation)\b/i.test(
+      answer
+    );
+  return hasNumericClaim && hasMarketOrPerformanceLanguage;
+}
+
+function getConsistencyRepeatsFromEnv(): number {
+  const value = Number(process.env.GAUNTLET_AGENT_CONSISTENCY_REPEATS ?? DEFAULT_CONSISTENCY_REPEATS);
+  if (!Number.isFinite(value)) {
+    return DEFAULT_CONSISTENCY_REPEATS;
+  }
+  // Keep reruns bounded to avoid accidental high-cost experiment runs.
+  return Math.min(5, Math.max(1, Math.floor(value)));
+}
+
+function getPrimaryToolName(invokedTools: unknown): string | undefined {
+  if (!Array.isArray(invokedTools)) {
+    return undefined;
+  }
+  const first = invokedTools[0];
+  return typeof first === 'string' ? first : undefined;
 }
 
 function getAuthEndpointFromApiUrl(apiUrl: string): string {
@@ -546,6 +573,163 @@ async function main(): Promise<void> {
             key: 'latency',
             score: ok ? 1 : 0,
             comment: `latencyMs=${Number.isFinite(latency) ? latency : 'NaN'}, budgetMs=${budget}`
+          };
+        },
+        async ({
+          outputs,
+          inputs,
+          referenceOutputs
+        }: {
+          outputs?: LangSmithExampleRecord;
+          inputs?: LangSmithExampleRecord;
+          referenceOutputs?: LangSmithExampleRecord;
+        }) => {
+          const result = (outputs ?? {}) as AgentResult & LangSmithExampleRecord;
+          const inputRecord = (inputs ?? {}) as LangSmithExampleRecord;
+          const referenceRecord = (referenceOutputs ?? {}) as LangSmithExampleRecord;
+          const category = getCategory(inputRecord, referenceRecord);
+          if (category !== 'edge_case') {
+            return { key: 'edge_cases', score: 1, comment: 'Non-edge-case input.' };
+          }
+
+          const details: string[] = [];
+          if (!toStringValue(result.answer ?? '').trim()) {
+            details.push('Edge case answer is empty.');
+          }
+          const latency = Number(result.latencyMs ?? Number.NaN);
+          if (!Number.isFinite(latency) || latency < 0) {
+            details.push('Edge case latency is invalid.');
+          }
+
+          return {
+            key: 'edge_cases',
+            score: details.length === 0 ? 1 : 0,
+            comment: details.join(' | ') || 'Edge-case checks passed.'
+          };
+        },
+        async ({
+          outputs,
+          inputs,
+          referenceOutputs
+        }: {
+          outputs?: LangSmithExampleRecord;
+          inputs?: LangSmithExampleRecord;
+          referenceOutputs?: LangSmithExampleRecord;
+        }) => {
+          const result = (outputs ?? {}) as AgentResult & LangSmithExampleRecord;
+          const inputRecord = (inputs ?? {}) as LangSmithExampleRecord;
+          const referenceRecord = (referenceOutputs ?? {}) as LangSmithExampleRecord;
+          const expectedToolCalls = getExpectedToolCalls(inputRecord, referenceRecord);
+          const expectedToolNames = expectedToolCalls
+            .map((tool) => toStringValue(tool.name))
+            .filter(Boolean);
+          const actualToolNames = Array.isArray(result.invokedTools)
+            ? result.invokedTools
+            : [];
+          const answer = toStringValue(result.answer ?? '');
+
+          // If a tool-backed answer was expected but no tools ran, the model should clearly refuse
+          // to provide concrete portfolio facts instead of fabricating them.
+          if (expectedToolNames.length > 0 && actualToolNames.length === 0) {
+            const hasSafeFallbackSignal =
+              includesIgnoreCase(answer, 'do not have verified tool data') ||
+              includesIgnoreCase(answer, 'please ask me to run') ||
+              includesIgnoreCase(answer, 'cannot verify') ||
+              includesIgnoreCase(answer, 'I can only help');
+            return {
+              key: 'hallucination',
+              score: hasSafeFallbackSignal ? 1 : 0,
+              comment: hasSafeFallbackSignal
+                ? 'No tool data used; response included an explicit verification disclaimer.'
+                : 'Potential hallucination: tool-backed response expected, but no tool data/disclaimer found.'
+            };
+          }
+
+          // If no tool use is expected and no tool was invoked, fail only when we see concrete
+          // market/performance-like numeric claims that are likely ungrounded.
+          if (
+            expectedToolNames.length === 0 &&
+            actualToolNames.length === 0 &&
+            looksLikeSpecificUnverifiedClaim(answer)
+          ) {
+            return {
+              key: 'hallucination',
+              score: 0,
+              comment:
+                'Potential hallucination: response contains concrete numeric portfolio/market claim without tool grounding.'
+            };
+          }
+
+          return {
+            key: 'hallucination',
+            score: 1,
+            comment: 'No hallucination signal detected.'
+          };
+        },
+        async ({
+          outputs,
+          inputs
+        }: {
+          outputs?: LangSmithExampleRecord;
+          inputs?: LangSmithExampleRecord;
+          referenceOutputs?: LangSmithExampleRecord;
+        }) => {
+          const result = (outputs ?? {}) as AgentResult & LangSmithExampleRecord;
+          const inputRecord = (inputs ?? {}) as LangSmithExampleRecord;
+          const inputQuery = getInputQuery(inputRecord);
+          const repeats = getConsistencyRepeatsFromEnv();
+
+          if (!inputQuery) {
+            return {
+              key: 'consistency',
+              score: 1,
+              comment: 'Skipped consistency check: empty input query.'
+            };
+          }
+
+          if (repeats < 2) {
+            return {
+              key: 'consistency',
+              score: 1,
+              comment: `Consistency repeats set to ${repeats}; check skipped.`
+            };
+          }
+
+          const details: string[] = [];
+          const baselineVerdict = toStringValue(result.verdict).toUpperCase() || '<none>';
+          const baselinePrimaryTool = getPrimaryToolName(result.invokedTools) ?? '<none>';
+
+          for (let runIndex = 2; runIndex <= repeats; runIndex++) {
+            try {
+              const rerun = await runGauntletAgent(inputQuery);
+              const rerunVerdict = rerun.verdict ?? '<none>';
+              const rerunPrimaryTool = getPrimaryToolName(rerun.invokedTools) ?? '<none>';
+
+              if (rerunVerdict !== baselineVerdict) {
+                details.push(
+                  `Run ${runIndex}: verdict mismatch (${rerunVerdict} vs ${baselineVerdict}).`
+                );
+              }
+              if (rerunPrimaryTool !== baselinePrimaryTool) {
+                details.push(
+                  `Run ${runIndex}: primary tool mismatch (${rerunPrimaryTool} vs ${baselinePrimaryTool}).`
+                );
+              }
+            } catch (error) {
+              details.push(
+                `Run ${runIndex}: consistency rerun failed (${
+                  error instanceof Error ? error.message : String(error)
+                }).`
+              );
+            }
+          }
+
+          return {
+            key: 'consistency',
+            score: details.length === 0 ? 1 : 0,
+            comment:
+              details.join(' | ') ||
+              `Consistent across ${repeats} runs (verdict and primary tool).`
           };
         }
       ]

@@ -106,13 +106,16 @@ export class GfGauntletChatWidgetComponent implements OnDestroy, OnInit {
       query: 'Give me my portfolio overview.'
     },
     {
-      query: 'Give me my portfolio performance.'
+      query: 'How is my portfolio performance this year?'
     },
     {
       query: 'List my recent activity.'
     },
     {
-      query: 'What are my top holdings and allocation?'
+      query: 'Run my portfolio risk report.'
+    },
+    {
+      query: 'Show AAPL historical price for 2025.'
     }
   ];
 

@@ -166,6 +166,7 @@
 .gauntlet-sidebar {
   width: 16.5rem;
   flex-shrink: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -239,11 +240,28 @@
 
 .gauntlet-history-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-height: 0;
   gap: 0.35rem;
   max-height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.1rem;
+  scrollbar-width: thin;
+}
+
+.gauntlet-history-list::-webkit-scrollbar {
+  width: 0.4rem;
+}
+
+.gauntlet-history-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: rgba(var(--dark-secondary-text), 0.38);
+}
+
+.gauntlet-history-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--dark-secondary-text), 0.52);
 }
 
 .gauntlet-history-empty {
