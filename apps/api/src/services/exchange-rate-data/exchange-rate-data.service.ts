@@ -34,6 +34,7 @@ export class ExchangeRateDataService {
   private currencyPairs: DataGatheringItem[] = [];
   private derivedCurrencyFactors: { [currencyPair: string]: number } = {};
   private exchangeRates: { [currencyPair: string]: number } = {};
+  private readonly missingExchangeRateLogs = new Set<string>();
 
   public constructor(
     private readonly dataProviderService: DataProviderService,
@@ -110,9 +111,9 @@ export class ExchangeRateDataService {
             previousExchangeRate;
 
           if (currency === DEFAULT_CURRENCY && isBefore(date, new Date())) {
-            Logger.error(
-              `No exchange rate has been found for ${currency}${targetCurrency} at ${dateString}`,
-              'ExchangeRateDataService'
+            this.logMissingExchangeRateOnce(
+              `${currency}${targetCurrency}-${dateString}`,
+              `No exchange rate has been found for ${currency}${targetCurrency} at ${dateString}`
             );
           }
         } else {
@@ -253,9 +254,9 @@ export class ExchangeRateDataService {
     }
 
     // Fallback with error, if currencies are not available
-    Logger.error(
-      `No exchange rate has been found for ${aFromCurrency}${aToCurrency}`,
-      'ExchangeRateDataService'
+    this.logMissingExchangeRateOnce(
+      `${aFromCurrency}${aToCurrency}`,
+      `No exchange rate has been found for ${aFromCurrency}${aToCurrency}`
     );
 
     return aValue;
@@ -341,12 +342,12 @@ export class ExchangeRateDataService {
       return factor * aValue;
     }
 
-    Logger.error(
+    this.logMissingExchangeRateOnce(
+      `${aFromCurrency}${aToCurrency}-${format(aDate, DATE_FORMAT)}`,
       `No exchange rate has been found for ${aFromCurrency}${aToCurrency} at ${format(
         aDate,
         DATE_FORMAT
-      )}`,
-      'ExchangeRateDataService'
+      )}`
     );
 
     return undefined;
@@ -483,7 +484,10 @@ export class ExchangeRateDataService {
             errorMessage = `${errorMessage} and ${DEFAULT_CURRENCY}${currencyTo}`;
           }
 
-          Logger.error(`${errorMessage}.`, 'ExchangeRateDataService');
+          this.logMissingExchangeRateOnce(
+            `${currencyFrom}${currencyTo}-${format(date, DATE_FORMAT)}`,
+            `${errorMessage}.`
+          );
         }
       }
     }
@@ -552,5 +556,14 @@ export class ExchangeRateDataService {
           symbol: `${DEFAULT_CURRENCY}${currency}`
         };
       });
+  }
+
+  private logMissingExchangeRateOnce(key: string, message: string) {
+    if (this.missingExchangeRateLogs.has(key)) {
+      return;
+    }
+
+    this.missingExchangeRateLogs.add(key);
+    Logger.warn(message, 'ExchangeRateDataService');
   }
 }

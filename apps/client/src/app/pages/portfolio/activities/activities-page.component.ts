@@ -17,7 +17,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { PageEvent } from '@angular/material/paginator';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Sort, SortDirection } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -25,6 +25,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { format, parseISO } from 'date-fns';
 import { addIcons } from 'ionicons';
 import { addOutline } from 'ionicons/icons';
+import ms from 'ms';
 import { DeviceDetectorService } from 'ngx-device-detector';
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -62,6 +63,7 @@ export class GfActivitiesPageComponent implements OnDestroy, OnInit {
   public user: User;
 
   private unsubscribeSubject = new Subject<void>();
+  private refreshTimers: ReturnType<typeof setTimeout>[] = [];
 
   public constructor(
     private changeDetectorRef: ChangeDetectorRef,
@@ -72,6 +74,7 @@ export class GfActivitiesPageComponent implements OnDestroy, OnInit {
     private impersonationStorageService: ImpersonationStorageService,
     private route: ActivatedRoute,
     private router: Router,
+    private snackBar: MatSnackBar,
     private userService: UserService
   ) {
     this.routeQueryParams = route.queryParams
@@ -263,7 +266,12 @@ export class GfActivitiesPageComponent implements OnDestroy, OnInit {
     dialogRef
       .afterClosed()
       .pipe(takeUntil(this.unsubscribeSubject))
-      .subscribe(() => {
+      .subscribe((result?: { imported?: boolean }) => {
+        if (result?.imported) {
+          this.refreshAfterImport();
+          return;
+        }
+
         this.userService
           .get(true)
           .pipe(takeUntil(this.unsubscribeSubject))
@@ -290,7 +298,12 @@ export class GfActivitiesPageComponent implements OnDestroy, OnInit {
     dialogRef
       .afterClosed()
       .pipe(takeUntil(this.unsubscribeSubject))
-      .subscribe(() => {
+      .subscribe((result?: { imported?: boolean }) => {
+        if (result?.imported) {
+          this.refreshAfterImport();
+          return;
+        }
+
         this.userService
           .get(true)
           .pipe(takeUntil(this.unsubscribeSubject))
@@ -348,8 +361,47 @@ export class GfActivitiesPageComponent implements OnDestroy, OnInit {
   }
 
   public ngOnDestroy() {
+    for (const timer of this.refreshTimers) {
+      clearTimeout(timer);
+    }
+
     this.unsubscribeSubject.next();
     this.unsubscribeSubject.complete();
+  }
+
+  private refreshAfterImport() {
+    this.snackBar.open(
+      '⏳ ' + $localize`Syncing portfolio data. This can take a few seconds.`
+    );
+
+    for (const timer of this.refreshTimers) {
+      clearTimeout(timer);
+    }
+    this.refreshTimers = [];
+
+    const refresh = () => {
+      this.userService
+        .get(true)
+        .pipe(takeUntil(this.unsubscribeSubject))
+        .subscribe();
+
+      this.fetchActivities();
+    };
+
+    refresh();
+
+    this.refreshTimers.push(
+      setTimeout(refresh, 1500),
+      setTimeout(refresh, 4000),
+      setTimeout(() => {
+        this.snackBar.dismiss();
+        this.snackBar.open(
+          '✅ ' + $localize`Portfolio has been updated`,
+          undefined,
+          { duration: ms('3 seconds') }
+        );
+      }, 5200)
+    );
   }
 
   private openCreateActivityDialog(aActivity?: Activity) {

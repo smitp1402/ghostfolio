@@ -25,7 +25,10 @@ import { addDays, format, isSameDay } from 'date-fns';
 import { uniqBy } from 'lodash';
 import YahooFinance from 'yahoo-finance2';
 import { ChartResultArray } from 'yahoo-finance2/esm/src/modules/chart';
-import { withRetryOnNetworkError } from './yahoo-finance-retry';
+import {
+  isNetworkError,
+  withRetryOnNetworkError
+} from './yahoo-finance-retry';
 import {
   HistoricalDividendsResult,
   HistoricalHistoryResult
@@ -198,7 +201,14 @@ export class YahooFinanceService implements DataProviderInterface {
         try {
           return await this.yahooFinance.quote(yahooFinanceSymbols);
         } catch (error) {
-          Logger.error(error, 'YahooFinanceService');
+          if (isNetworkError(error)) {
+            Logger.warn(
+              'Yahoo Finance quote endpoint is temporarily unreachable. Falling back to quote summary.',
+              'YahooFinanceService'
+            );
+          } else {
+            Logger.error(error, 'YahooFinanceService');
+          }
 
           Logger.warn(
             'Fallback to yahooFinance.quoteSummary()',
@@ -232,7 +242,14 @@ export class YahooFinanceService implements DataProviderInterface {
 
       return response;
     } catch (error) {
-      Logger.error(error, 'YahooFinanceService');
+      if (isNetworkError(error)) {
+        Logger.warn(
+          'Yahoo Finance is temporarily unreachable. Returning empty quote response.',
+          'YahooFinanceService'
+        );
+      } else {
+        Logger.error(error, 'YahooFinanceService');
+      }
 
       return {};
     }
@@ -368,10 +385,17 @@ export class YahooFinanceService implements DataProviderInterface {
       .filter(
         (result): result is PromiseFulfilledResult<QuoteSummaryResult> => {
           if (result.status === 'rejected') {
-            Logger.error(
-              `Could not get quote summary: ${result.reason}`,
-              'YahooFinanceService'
-            );
+            if (isNetworkError(result.reason)) {
+              Logger.warn(
+                'Could not get quote summary due to temporary Yahoo network issue.',
+                'YahooFinanceService'
+              );
+            } else {
+              Logger.error(
+                `Could not get quote summary: ${result.reason}`,
+                'YahooFinanceService'
+              );
+            }
 
             return false;
           }

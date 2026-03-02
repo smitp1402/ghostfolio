@@ -167,10 +167,12 @@ export class GfImportActivitiesDialogComponent implements OnDestroy {
   }
 
   public onCancel() {
-    this.dialogRef.close();
+    this.dialogRef.close({ imported: false });
   }
 
   public async onImportActivities() {
+    let imported = false;
+
     try {
       this.snackBar.open('⏳ ' + $localize`Importing data...`);
 
@@ -180,6 +182,8 @@ export class GfImportActivitiesDialogComponent implements OnDestroy {
         assetProfiles: this.assetProfiles,
         tags: this.tags
       });
+
+      imported = true;
 
       this.snackBar.open(
         '✅ ' + $localize`Import has been completed`,
@@ -199,7 +203,7 @@ export class GfImportActivitiesDialogComponent implements OnDestroy {
         }
       );
     } finally {
-      this.dialogRef.close();
+      this.dialogRef.close({ imported });
     }
   }
 
