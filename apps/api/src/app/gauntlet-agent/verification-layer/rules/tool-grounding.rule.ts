@@ -15,9 +15,7 @@ export const toolGroundingRule: VerificationRule = {
     if (hasNumericClaims && !hasToolEvidence) {
       return {
         verdict: 'REWRITE',
-        reason: 'numeric_claims_without_tool_evidence',
-        rewrittenResponse:
-          'I want to make sure the numbers I share are accurate. Please ask again, and I will provide a clear and reliable response.'
+        reason: 'numeric_claims_without_tool_evidence'
       };
     }
 
